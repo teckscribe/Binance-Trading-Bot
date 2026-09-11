@@ -6,7 +6,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd "$HERE"
 
 echo "========================================================"
-ècho " Setting up Kronos Dedicated Virtual Environment (venv) "
+echo " Setting up Kronos Dedicated Virtual Environment (venv) "
 echo "======================================================="
 
 if ! command -v python3 >/dev/null 2>&1; then
