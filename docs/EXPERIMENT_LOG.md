@@ -7,6 +7,37 @@ measured to be actively harmful.
 
 ---
 
+## 0. PRODUCTION RELEASE (2026-09-11)
+
+### 0.1 Monotone High-Water Mark (HWM) & Dual-Stage Hybrid Ladder
+- **Peak Favourable Excursion (HWM)**: Monotonically tracks peak favorable excursion since entry (hwm = max(prev_hwm, peak_gain)).
+- **Dual-Stage Hybrid Evaluation**:
+  - Stage 1 (+1.0% trigger → +0.15% lock): Evaluated on **15m bar close** (gain). Prevents 1-second noise whipsaws from locking breakeven prematurely right after entry.
+  - Stage 2 (+2.5% trigger → +1.50% lock) & Stage 3 (+4.0% trigger → +2.50% lock): Evaluated on **Peak HWM** (hwm). Captures rapid intra-bar wick spikes instantly.
+- **Threshold**: LADDER_HWM_TRIGGER_THRESHOLD = 0.020.
+
+### 0.2 Breakout Volume Expansion Filter
+- **Hypothesis**: Require current 1h breakout volume to be ≥ 1.0× the 24h rolling average hourly volume.
+- **Result**: Filters out low-liquidity fake-outs on illiquid altcoins. Dynamic signal strength scaled from 0.5 to 2.5 based on volume ratio.
+- **Config**: CSM_VOL_RATIO_MIN = 1.0.
+
+### 0.3 90-Day Regime Gating Sweep
+- **90-Day Backtest Analysis**:
+  - RANGING: **+666.0% ~ +719.7% net return** (66.3% win rate, max loss streak 11).
+  - BULL_TREND: **−130.5% loss** (short wicks squeezed, late longs top-ticked).
+  - BEAR_TREND: Dip-buying longs trapped in systematic trend bleed.
+- **Rule**: CSM remains strictly gated to RANGING markets where it possesses massive alpha.
+
+### 0.4 Latency & Architecture Optimizations
+- **0ms Order Warmup**: preload_exchange_specs() warms LOT_SIZE stepSize and PRICE_FILTER 	ickSize on startup in 1 bulk API call.
+- **Zero-Handshake Session Pooling**: uth_manager.py equipped with HTTPAdapter(pool_connections=30, pool_maxsize=30) and get_session().
+- **Rate-Gate**: Lowered MIN_REQ_GAP to 0.025s (25ms) and _BTC_REF_TTL to 60s in data_hub.py.
+
+### 0.5 Tokenized Asset & ETF Exclusion Filter
+- Added SKHYNIX, MU, SNDK, SAMSUNG, QQQ, SPY, EWY, KORU, SOXS, XAUT, PAXG, USDE, EUR, GBP to EXCLUDED_BASES in modules/symbol_filter.py.
+
+---
+
 ## 1. CURRENT STATE
 
 ### Strategy configuration
