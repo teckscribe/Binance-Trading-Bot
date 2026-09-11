@@ -1,46 +1,21 @@
-# ──Restart all the Services ───────────────────────────────────────────────────────────
+# CSB Bot Management Commands (Ubuntu 24.04)
 
-sudo systemctl daemon-reload
-sudo systemctl restart csb csb-bot csb-discord csb-web csb-ngrok
+# Status
+sudo systemctl status csb csb-bot csb-web csb-discord csb-ngrok
 
-
-sudo systemctl restart csb-web csb-ngrok
-
-# ── SERVICE CONTROL ───────────────────────────────────────────────────────────
-sudo systemctl start   csb
-sudo systemctl stop csb
+# Restart services
 sudo systemctl restart csb
-sudo systemctl status  csb
-
-journalctl -u csb -f
-
-# ── Telegram Bot Control ─────────────────────────────────────────────────────
-
-sudo systemctl start csb-bot
-sudo systemctl stop csb-bot
 sudo systemctl restart csb-bot
-journalctl -u csb-bot -f
-
-
-# ──Discord Bot Control ─────────────────────────────────────────────────────
-
-sudo systemctl start csb-discord
-sudo systemctl stop csb-discord
+sudo systemctl restart csb-web
 sudo systemctl restart csb-discord
-journalctl -u csb-discord -f
+sudo systemctl restart csb-ngrok
 
-# ── LIVE LOG MONITORING ───────────────────────────────────────────────────────
+# Logs
+sudo journalctl -u csb -f
+sudo journalctl -u csb-bot -f
+sudo journalctl -u csb-web -f
+sudo journalctl -u csb-discord -f
 
-journalctl -u csb -f
-
-
-
-# ──────Activate the Python virtual environment─────────────────────
-
-source venv/bin/activate
-
-#──────Install the new requirements──────
-
-pip install -r requirements.txt
-
-
+# Git Pull Updates
+git pull origin main
+sudo systemctl restart csb csb-bot csb-web csb-discord csb-ngrok

@@ -264,3 +264,4 @@ def fetch_open_interest(symbol: str) -> float | None:
         log.warning(f"OI fetch failed [{symbol}]: {exc}")
         return None
 
+

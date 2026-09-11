@@ -4,4 +4,4 @@ authtoken: "3HGkjsh5MgJ4Lsx5bt6Ey9h9cyT_53DTP1MGgwuocCfqG8PJW"
 tunnels:
   csb_dashboard:
     proto: http
-    addr: 8107
+    addr: 8102

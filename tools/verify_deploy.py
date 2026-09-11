@@ -18,7 +18,7 @@ for f in ["modules/llm_regime.py","modules/llm_advisor.py",
 
 hits = []
 for p in glob.glob("**/*.py", recursive=True):
-    if ".venv" in p or "__pycache__" in p: continue
+    if "venv" in p or "__pycache__" in p or ".git" in p: continue
     src = io.open(p, encoding="utf-8", errors="replace").read()
     try: tree = ast.parse(src)
     except SyntaxError as e:
@@ -41,7 +41,7 @@ print("2. EVERY PROJECT FILE COMPILES")
 print("=" * 70)
 bad_c = []
 for p in glob.glob("**/*.py", recursive=True):
-    if ".venv" in p or "__pycache__" in p: continue
+    if "venv" in p or "__pycache__" in p or ".git" in p: continue
     try: compile(io.open(p, encoding="utf-8", errors="replace").read(), p, "exec")
     except SyntaxError as e: bad_c.append("%s: %s" % (p, e))
 if bad_c:

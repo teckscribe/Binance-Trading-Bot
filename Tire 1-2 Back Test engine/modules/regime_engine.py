@@ -150,9 +150,10 @@ def _compute_adx(df, period=14):
         adx     = dx.ewm(alpha=1/period, adjust=False).mean()
 
         val = float(adx.iloc[-1])
-        return val if not pd.isna(val) else 0.0
+        return val if not pd.isna(val) else -1.0
     except Exception:
-        return 0.0
+        log.warning("ADX computation failed — returning -1 (will force RANGING)")
+        return -1.0
 
 
 def _sma_slope_pct(df, period=20, bars=3):
@@ -239,7 +240,7 @@ def _decide_regime(btc_trend, eth_trend, sol_trend, funding, btc_adx, btc_slope)
     # ADX < 20 AND slope flat → definitely RANGING (no strength, no movement)
     # ADX < 20 alone → RANGING (no trend strength regardless of slope)
     # ADX >= 20 + slope flat → trust ADX, allow trend (SMA20 lags price)
-    if btc_adx > 0 and btc_adx < ADX_REGIME_MIN:
+    if btc_adx < 0 or (btc_adx > 0 and btc_adx < ADX_REGIME_MIN):
         log.info(
             f"BTC ADX={btc_adx:.1f} < {ADX_REGIME_MIN} "
             f"slope={btc_slope*100:+.3f}% — no trend strength → RANGING"
@@ -292,6 +293,9 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
     btc_trend = _coin_trend(btc_1h, "BTC")
     eth_trend = _coin_trend(eth_1h, "ETH")
     sol_trend = _coin_trend(sol_1h, "SOL")
+
+    if eth_trend == "NEUTRAL" and (eth_1h is None or eth_1h.empty):
+        log.warning("ETH data unavailable — regime may be conservatively downgraded to RANGING")
 
     # v4: momentum filters
     btc_adx   = _compute_adx(btc_1h)
@@ -347,12 +351,6 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
                 f"BTC dist from SMA20: {((btc_price-sma20)/sma20)*100:+.2f}%"
             )
             raw_regime = _current_regime
-        else:
-            if not hold_ok:
-                log.info(
-                    f"Regime: strong move overrides hold time — "
-                    f"{_current_regime} → {raw_regime}"
-                )
 
     # Update state if regime changed
     if raw_regime != _current_regime:
@@ -483,17 +481,14 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
-    # Synced from the main tree 2026-08-29. This dict had drifted badly: it
-    # still listed VRP and LIQ (both deleted 2026-08-19, source files gone) and
-    # permitted CSM in BEAR_TREND and OVERSOLD, which main forbids.
-    #
-    # That was not inert. verify_configA.py gates entries on this dict, and the
-    # stale version let 1,243 BEAR_TREND shorts into a RANGING-only test --
-    # measured at -0.096%/trade, which turned +0.247% into -0.048% and looked
-    # like the strategy failing rather than the fixture being wrong.
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "ELLIOT_V8": True},
-    "BEAR_TREND":  {"CSM": False, "NASOS_V4": True,  "ELLIOT_V8": True},
-    "RANGING":     {"CSM": True,  "NASOS_V4": False, "ELLIOT_V8": False},
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True, "ELLIOT_V8": False},
+    "BEAR_TREND":  {"CSM": True, "NASOS_V4": True, "ELLIOT_V8": False},
+    "RANGING":     {"CSM": True, "NASOS_V4": False, "ELLIOT_V8": False},
+    # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
+    # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
+    # enough in the 90d window that it carries no measurement at all. Leaving it
+    # True would let CSM trade an unmeasured regime under a config tuned for a
+    # different one. Re-enable only with numbers behind it.
     "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "ELLIOT_V8": False},
     "OVERHEATED":  {},
 }
@@ -501,9 +496,6 @@ REGIME_STRATEGY_PERMISSIONS = {
 
 def is_strategy_permitted(regime, strategy_id):
     return REGIME_STRATEGY_PERMISSIONS.get(regime, {}).get(strategy_id, False)
-
-
-
 
 
 

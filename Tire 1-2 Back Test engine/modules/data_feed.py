@@ -38,7 +38,7 @@ import logging
 import requests
 import pandas as pd
 
-from modules.auth_manager import BASE_URL, public_headers
+from modules.auth_manager import SESSION, BASE_URL, public_headers
 
 log = logging.getLogger("DataFeed")
 
@@ -81,7 +81,7 @@ def _fetch_candles_raw(symbol: str, interval: str, limit: int = 200) -> list:
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = requests.get(
+            resp = SESSION.get(
                 url, params=params,
                 headers=public_headers(),
                 timeout=REQUEST_TIMEOUT,
@@ -196,7 +196,7 @@ def fetch_funding_rate(symbol: str) -> float | None:
     url    = BASE_URL + "/fapi/v1/premiumIndex"
     params = {"symbol": symbol}
     try:
-        resp = requests.get(
+        resp = SESSION.get(
             url, params=params,
             headers=public_headers(),
             timeout=REQUEST_TIMEOUT,
@@ -227,7 +227,7 @@ def fetch_mark_price(symbol: str) -> float | None:
     url    = BASE_URL + "/fapi/v1/premiumIndex"
     params = {"symbol": symbol}
     try:
-        resp = requests.get(
+        resp = SESSION.get(
             url, params=params,
             headers=public_headers(),
             timeout=REQUEST_TIMEOUT,
@@ -251,7 +251,7 @@ def fetch_open_interest(symbol: str) -> float | None:
     url    = BASE_URL + "/fapi/v1/openInterest"
     params = {"symbol": symbol}
     try:
-        resp = requests.get(
+        resp = SESSION.get(
             url, params=params,
             headers=public_headers(),
             timeout=REQUEST_TIMEOUT,
@@ -263,4 +263,5 @@ def fetch_open_interest(symbol: str) -> float | None:
     except Exception as exc:
         log.warning(f"OI fetch failed [{symbol}]: {exc}")
         return None
+
 

@@ -828,6 +828,7 @@ async def square_off(request: Request):
 if __name__ == "__main__":
     import uvicorn
     # Use 0.0.0.0 so it can be accessed over network
-    uvicorn.run(app, host="0.0.0.0", port=8107)
+    uvicorn.run(app, host="0.0.0.0", port=8102)
+
 
 

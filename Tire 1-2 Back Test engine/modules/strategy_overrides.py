@@ -42,17 +42,38 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["LIQ", "VRP", "CSM"]
+    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
 
 
 KNOWN_STRATEGIES = _production_strategy_ids()
 
+# Validity key is (mtime, size); CSB_NO_FILE_CACHE=true bypasses the cache.
+# This file is written by the Telegram/Discord bot process and read by the
+# scanner process, so the scanner relies on the key changing to see a /disable.
+_override_cache = {"key": None, "data": {}}
+_NO_FILE_CACHE = os.getenv("CSB_NO_FILE_CACHE", "false").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _file_key(path):
+    try:
+        st = os.stat(path)
+        return (st.st_mtime, st.st_size)
+    except OSError:
+        return None
+
 
 def _load() -> dict:
+    """Load overrides with (mtime,size)-based caching — called per-signal via is_disabled()."""
     try:
         if os.path.exists(_FILE):
+            key = _file_key(_FILE)
+            if not _NO_FILE_CACHE and key is not None and _override_cache["key"] == key:
+                return _override_cache["data"]
             with open(_FILE, encoding="utf-8") as _jf:
-                return json.load(_jf)
+                data = json.load(_jf)
+            _override_cache["key"] = key
+            _override_cache["data"] = data
+            return data
     except Exception as exc:
         log.warning(f"override load failed: {exc}")
     return {}
@@ -63,8 +84,11 @@ def _save(data: dict) -> None:
         os.makedirs(os.path.dirname(_FILE), exist_ok=True)
         with open(_FILE, "w") as f:
             json.dump(data, f, indent=2)
+        _override_cache["key"]  = _file_key(_FILE)
+        _override_cache["data"] = data
     except Exception as exc:
         log.error(f"override save failed: {exc}")
+        _override_cache["key"] = None
 
 
 def is_disabled(strategy: str) -> bool:
@@ -114,6 +138,5 @@ def get_all() -> dict:
             "reason":    entry.get("reason", ""),
         }
     return out
-
 
 

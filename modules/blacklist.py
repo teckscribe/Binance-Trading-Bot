@@ -133,3 +133,4 @@ def remove(symbol: str, strategies: list = None) -> bool:
 def get_all() -> dict:
     return _load()
 
+

@@ -197,6 +197,69 @@ def _load_labelled(force: bool = False) -> list[dict]:
 # FEATURE COMPUTATION  (~27 dimensionless features)
 # -
 
+def _compute_15m_indicators(df_15m: pd.DataFrame | None) -> dict:
+    """ADX/RSI/ATR%/MACD-hist/Donchian/EMA-dist/vol-ratio from 15m OHLCV.
+
+    These were historically expected in signal['ml_features'], but no strategy
+    populates that dict, so all eight were logged as 0.0 for every trade. Compute
+    them centrally here so every strategy gets a full feature vector.  No
+    lookahead — uses only bars up to the last completed one.  Returns zeros when
+    df is missing or too short.
+    """
+    keys = ["adx", "rsi", "atr_pct", "macd_hist_norm",
+            "donchian_pos", "dist_from_ema_pct", "vol_ratio"]
+    out = {k: 0.0 for k in keys}
+    if df_15m is None or len(df_15m) < 28:
+        return out
+    try:
+        c  = df_15m["close"].astype(float)
+        h  = df_15m["high"].astype(float)
+        lo = df_15m["low"].astype(float)
+        v  = df_15m["volume"].astype(float) if "volume" in df_15m.columns \
+             else pd.Series([0.0] * len(df_15m), index=c.index)
+
+        # Wilder ATR(14) + ADX(14)
+        prev_c = c.shift(1)
+        tr  = pd.concat([h - lo, (h - prev_c).abs(), (lo - prev_c).abs()], axis=1).max(axis=1)
+        atr = tr.ewm(alpha=1 / 14, adjust=False).mean()
+        up  = h.diff(); dn = -lo.diff()
+        plus_dm  = ((up > dn) & (up > 0)) * up.clip(lower=0)
+        minus_dm = ((dn > up) & (dn > 0)) * dn.clip(lower=0)
+        atr_safe = atr.replace(0, np.nan)
+        plus_di  = 100 * plus_dm.ewm(alpha=1 / 14, adjust=False).mean() / atr_safe
+        minus_di = 100 * minus_dm.ewm(alpha=1 / 14, adjust=False).mean() / atr_safe
+        dx  = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+        adx = float(dx.ewm(alpha=1 / 14, adjust=False).mean().iloc[-1])
+        out["adx"]     = _clip(adx if np.isfinite(adx) else 0.0, 0, 100)
+        out["atr_pct"] = _clip(_safe_div(float(atr.iloc[-1]), float(c.iloc[-1])) * 100, 0, 50)
+
+        # RSI(14)
+        delta = c.diff()
+        gain  = delta.clip(lower=0).rolling(14).mean()
+        loss  = (-delta.clip(upper=0)).rolling(14).mean()
+        rs    = gain / loss.replace(0, np.nan)
+        rsi_v = float((100 - 100 / (1 + rs)).iloc[-1])
+        out["rsi"] = _clip(rsi_v if np.isfinite(rsi_v) else 50.0, 0, 100)
+
+        # MACD(12,26,9) histogram, normalised by price
+        macd = c.ewm(span=12, adjust=False).mean() - c.ewm(span=26, adjust=False).mean()
+        hist = float((macd - macd.ewm(span=9, adjust=False).mean()).iloc[-1])
+        out["macd_hist_norm"] = _clip(_safe_div(hist, float(c.iloc[-1])) * 100, -50, 50)
+
+        # Donchian(20) position (0 = channel low, 1 = channel high)
+        hh = float(h.rolling(20).max().iloc[-1]); ll = float(lo.rolling(20).min().iloc[-1])
+        out["donchian_pos"] = _clip(_safe_div(float(c.iloc[-1]) - ll, hh - ll), 0, 1)
+
+        # EMA(20) distance and volume ratio
+        ema20 = float(c.ewm(span=20, adjust=False).mean().iloc[-1])
+        out["dist_from_ema_pct"] = _clip(_safe_div(float(c.iloc[-1]) - ema20, ema20) * 100, -50, 50)
+        vavg = float(v.rolling(20).mean().iloc[-1])
+        out["vol_ratio"] = _clip(_safe_div(float(v.iloc[-1]), vavg) if vavg > 0 else 0.0, 0, 10)
+    except Exception:
+        pass
+    return out
+
+
 def _compute_features(
     signal:         dict,
     regime:         dict,
@@ -219,17 +282,24 @@ def _compute_features(
     direction  = signal.get("direction", "LONG")
     regime_str = regime.get("regime", "RANGING")
 
-    # -"-"- From strategy.scan() -"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-
+    # -"-"- Strategy-timeframe indicators -"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-
+    # Computed here from 15m OHLCV because strategies do not populate
+    # signal['ml_features'] (all eight were 0.0 for every trade otherwise).  A
+    # strategy MAY still override any of these by supplying ml_features.
+    sf = _compute_15m_indicators(df_15m)
+    sl_px       = float(signal.get("sl_price", 0) or 0)
+    sl_dist_pct = _clip(abs(entry - sl_px) / entry * 100, 0, 50) if sl_px > 0 else 0.0
+
     features = {
-        "adx":               float(feat.get("adx", 0)),
-        "vol_ratio":         float(feat.get("vol_ratio", 0)),
-        "atr_pct":           float(feat.get("atr_pct", 0)),
-        "sl_dist_pct":       float(feat.get("sl_dist_pct", 0)),
+        "adx":               float(feat.get("adx", sf["adx"])),
+        "vol_ratio":         float(feat.get("vol_ratio", sf["vol_ratio"])),
+        "atr_pct":           float(feat.get("atr_pct", sf["atr_pct"])),
+        "sl_dist_pct":       float(feat.get("sl_dist_pct", sl_dist_pct)),
         "strength":          float(signal.get("strength", 0)),
-        "rsi":               float(feat.get("rsi", 0)),
-        "dist_from_ema_pct": float(feat.get("dist_from_ema_pct", 0)),
-        "macd_hist_norm":    float(feat.get("macd_hist_norm", 0)),
-        "donchian_pos":      float(feat.get("donchian_pos", 0)),
+        "rsi":               float(feat.get("rsi", sf["rsi"])),
+        "dist_from_ema_pct": float(feat.get("dist_from_ema_pct", sf["dist_from_ema_pct"])),
+        "macd_hist_norm":    float(feat.get("macd_hist_norm", sf["macd_hist_norm"])),
+        "donchian_pos":      float(feat.get("donchian_pos", sf["donchian_pos"])),
     }
 
     # -"-"- Market context -"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-
@@ -947,4 +1017,5 @@ def commit_ml_signal(
     features = ml_adj.get("_features", {})
     _log_signal_entry(sid, signal, size, regime, features)
     ml_adj["_committed"] = True
+
 

@@ -115,21 +115,6 @@ LADDER_HWM_TRIGGER_THRESHOLD = 0.020
 VOL_RATIO_MIN = _f("CSM_VOL_RATIO_MIN", 1.0)
 
 # ── Stop management when the ladder is empty ────────────────────────────────
-# CSM_PROFIT_LADDER=off used to mean "fall back to the legacy breakeven", and
-# there was NO way to express "run the initial SL/TP and nothing else".
-#
-# That third mode is not hypothetical: it is what the sweep actually measured
-# for its highest-expectancy configuration, so without this flag that config
-# CANNOT be reproduced by the live engine -- the else-branch would silently add
-# a breakeven and a 2xATR trail the measurement never included.
-#
-# Set CSM_LEGACY_BE=false WITH CSM_PROFIT_LADDER=off to get fixed SL/TP + max
-# hold only. To be clear about what that does and does not remove: the entry
-# stop and target are untouched and still enforced (by manage(), by the
-# universal check in live_scanner, and by the exchange STOP_MARKET in LIVE).
-# What is removed is only the RATCHET -- nothing moves the stop after entry.
-# That is a deliberate design, not the accidental no-stop state warned about in
-# docs/EXPERIMENT_LOG.md 17.5.
 LEGACY_BREAKEVEN = _b("CSM_LEGACY_BE", False)
 
 # Breakeven trigger used ONLY by the legacy path (CSM_PROFIT_LADDER=off).
@@ -375,4 +360,5 @@ class CrossSectionalMomentum(BaseStrategy):
                 return {"exit": True, "exit_price": current_price, "exit_reason": self.stop_exit_reason(position)}
 
         return {"exit": False, "exit_price": 0.0, "exit_reason": ""}
+
 

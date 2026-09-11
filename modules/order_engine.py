@@ -1037,6 +1037,7 @@ class OrderEngine:
             "exit_time":            datetime.now(timezone.utc).isoformat(),
             "exit_price":           exit_price,
             "exit_reason":          exit_reason,
+            "exit_source":          "bot",
             "pnl_pct":              round(pnl_pct, 6),
             "pnl_usdt":             round(pnl_usdt, 4),
             "pnl_usdt_net":         round(pnl_usdt_net, 4),
@@ -1044,7 +1045,6 @@ class OrderEngine:
             "pnl_equity_pct":       round(pnl_equity_pct_net, 6),
             "pnl_equity_pct_gross": round(pnl_equity_pct, 6),
             "pnl_pct_100":          round(pnl_equity_pct_net * 100, 4),
-            "exit_source":          "bot",
             "status":               "CLOSED",
         })
 
@@ -1190,13 +1190,13 @@ class OrderEngine:
                     "exit_time":      datetime.now(timezone.utc).isoformat(),
                     "exit_price":     close_price,
                     "exit_reason":    "MANUAL_CLOSE",
+                    "exit_source":    "manual",
                     "pnl_pct":        round(pnl_pct, 6),
                     "pnl_usdt":       round(pnl_usdt, 4),
                     "pnl_usdt_net":   round(pnl_net, 4),
                     "fee_usdt":       round(fee_usdt, 4),
                     "pnl_equity_pct": round(pnl_eq, 6),
                     "pnl_pct_100":    round(pnl_eq * 100, 4),
-                    "exit_source":    "manual",
                     "status":         "CLOSED",
                 })
                 self.session_pnl_pct += pnl_eq
@@ -1244,5 +1244,6 @@ class OrderEngine:
             "open_trades":   len(self.active),
             "by_strategy":   by_strategy,
         }
+
 
 

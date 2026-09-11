@@ -1,5 +1,5 @@
 """
-Port of Freqtrade strategy: ElliotV8_original_ichiv2.py
+Port of Freqtrade strategy: NotAnotherSMAOffsetStrategyHOv3.py
 Adapted for BaseStrategy architecture using 5m resampled candles.
 """
 
@@ -9,10 +9,10 @@ import pandas_ta as ta
 import math
 from .base_strategy import BaseStrategy, make_exit, no_exit
 
-def EWO(df, ema_length=5, ema2_length=3):
+def EWO(df, ema_length=5, ema2_length=35):
     ema1 = ta.ema(df['close'], length=ema_length)
     ema2 = ta.ema(df['close'], length=ema2_length)
-    return (ema1 - ema2) / df['close'] * 100
+    return (ema1 - ema2) / df['low'] * 100
 
 def hull_moving_average(close: pd.Series, window: int) -> pd.Series:
     half_length = int(window / 2)
@@ -21,8 +21,8 @@ def hull_moving_average(close: pd.Series, window: int) -> pd.Series:
     wmas = ta.wma(close, length=window)
     return ta.wma(wmaf * 2 - wmas, length=sqrt_length)
 
-class ElliotV8Port(BaseStrategy):
-    STRATEGY_ID = "ELLIOT_V8"
+class SMAOffsetPort(BaseStrategy):
+    STRATEGY_ID = "SMA_OFFSET"
     REQUIRES_1H = False
     REQUIRES_1M_DEPTH = 1500
 
@@ -51,13 +51,15 @@ class ElliotV8Port(BaseStrategy):
         close = df_5m['close']
         volume = df_5m['volume']
 
-        base_nb_candles_buy = 12
-        base_nb_candles_sell = 22
-        low_offset = 0.987
-        high_offset = 1.008
-        ewo_high = 3.147
-        ewo_low = -17.145
-        rsi_buy = 57
+        base_nb_candles_buy = 8
+        base_nb_candles_sell = 16
+        low_offset = 0.986
+        low_offset_2 = 0.944
+        high_offset = 1.054
+        ewo_high = 4.179
+        ewo_high_2 = -2.609
+        ewo_low = -16.917
+        rsi_buy = 58
 
         ma_buy = ta.ema(close, length=base_nb_candles_buy)
         ma_sell = ta.ema(close, length=base_nb_candles_sell)
@@ -75,43 +77,25 @@ class ElliotV8Port(BaseStrategy):
                 (close.iloc[i] < (ma_sell.iloc[i] * high_offset))
 
         cond2 = (rsi_fast.iloc[i] < 35) and \
+                (close.iloc[i] < (ma_buy.iloc[i] * low_offset_2)) and \
+                (ewo.iloc[i] > ewo_high_2) and \
+                (rsi.iloc[i] < rsi_buy) and \
+                (volume.iloc[i] > 0) and \
+                (close.iloc[i] < (ma_sell.iloc[i] * high_offset)) and \
+                (rsi.iloc[i] < 25)
+
+        cond3 = (rsi_fast.iloc[i] < 35) and \
                 (close.iloc[i] < (ma_buy.iloc[i] * low_offset)) and \
                 (ewo.iloc[i] < ewo_low) and \
                 (volume.iloc[i] > 0) and \
                 (close.iloc[i] < (ma_sell.iloc[i] * high_offset))
 
-        if cond1 or cond2:
+        if cond1 or cond2 or cond3:
             entry_price = float(df_1m['close'].iloc[-1])
-            # Flat 8% stop, as ported. Briefly cut to 3% while risk_engine's
-            # MAX_SL_PCT was set to 0.03 — which would otherwise have REJECTED
-            # every signal from this port and silently stopped it trading.
-            # MAX_SL_PCT is now 0.10, so the original stop is restored.
-            #
-            # Do not tighten this without measuring: the strategy is built
-            # around a wide stop (~72% win rate at R:R ~0.45), and its edge
-            # depends on giving trades room. It is well inside the 10% ceiling.
             sl_price = entry_price * (1 - 0.08)
             atr = float(ta.atr(df_1m['high'], df_1m['low'], df_1m['close'], length=14).iloc[-1])
             tp_price = entry_price + atr * 3.0
 
-            # Signal strength = how deep the 5m fast-RSI washout is. Entry
-            # already requires rsi_fast < 35, so this maps [35 -> 0] onto
-            # [0.0 -> 1.0]. live_scanner drops anything below MIN_STRENGTH
-            # (0.50, i.e. rsi_fast < 17.5) and ranks the rest.
-            #
-            # ELLIOT_V8 is the ONLY strategy that opts into this gate, because
-            # it is the only one the gate helps. Measured 90d / 100 symbols on
-            # the fixed harness with 0.03%/side slippage:
-            #
-            #   ungated  1018 trades  E=-0.038%  total  -39%
-            #   gated     430 trades  E=+0.144%  total  +62%   (+101pp)
-            #
-            # Ungated, this strategy is a net loser: 72% win rate but R:R 0.61,
-            # picking up small wins in front of an 8% stop. The gate keeps only
-            # the deep washouts, which is where its edge actually lives.
-            #
-            # The SAME gate COSTS NASOS_V4 242pp (see freqtrade_port_nasos.py),
-            # so do not generalise this to the other ports.
             rsi_val = float(rsi_fast.iloc[i])
             strength_val = max(0.0, min(1.0, (35.0 - rsi_val) / 35.0))
 
@@ -124,7 +108,7 @@ class ElliotV8Port(BaseStrategy):
                 'tp_price': tp_price,
                 'atr': atr,
                 'strength': strength_val,
-                'reason': 'ElliotV8_Entry',
+                'reason': 'SMA_OFFSET_Entry',
                 'leverage': 1
             }
 
@@ -154,17 +138,18 @@ class ElliotV8Port(BaseStrategy):
         close = df_5m['close']
         volume = df_5m['volume']
         hma_50 = hull_moving_average(close, window=50)
-        ma_sell = ta.ema(close, length=22)
+        sma_9 = ta.sma(close, length=9)
+        ma_sell = ta.ema(close, length=16)
         rsi = ta.rsi(close, length=14)
         rsi_fast = ta.rsi(close, length=4)
         rsi_slow = ta.rsi(close, length=20)
 
         i = -2
         
-        high_offset_2 = 1.016
-        high_offset = 1.008
+        high_offset_2 = 1.018
+        high_offset = 1.054
 
-        cond1 = (close.iloc[i] > hma_50.iloc[i]) and \
+        cond1 = (close.iloc[i] > sma_9.iloc[i]) and \
                 (close.iloc[i] > (ma_sell.iloc[i] * high_offset_2)) and \
                 (rsi.iloc[i] > 50) and \
                 (volume.iloc[i] > 0) and \
@@ -176,8 +161,7 @@ class ElliotV8Port(BaseStrategy):
                 (rsi_fast.iloc[i] > rsi_slow.iloc[i])
 
         if cond1 or cond2:
-            return make_exit(float(df_1m['close'].iloc[-1]), "ELLIOT_SELL")
+            return make_exit(float(df_1m['close'].iloc[-1]), "SMA_OFFSET_SELL")
 
         return no_exit()
-
 

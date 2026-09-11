@@ -3,19 +3,11 @@ Port of Freqtrade strategy: ElliotV8_original_ichiv2.py
 Adapted for BaseStrategy architecture using 5m resampled candles.
 """
 
-import os
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
 import math
 from .base_strategy import BaseStrategy, make_exit, no_exit
-
-# Time-based exit for the freqtrade ports. 0 = OFF, which is the historical
-# behaviour: these strategies had NO time exit of any kind, so a flat position
-# could hold a slot indefinitely (observed live at 10 hours and ~0.0%). CSM has
-# had one since 2026-08-16; the ports never did, an asymmetry nobody chose.
-# Off by default so enabling it is a measured decision, not a silent change.
-PORT_MAX_HOLD_MIN = int(os.getenv("PORT_MAX_HOLD_MIN", "0"))
 
 def EWO(df, ema_length=5, ema2_length=3):
     ema1 = ta.ema(df['close'], length=ema_length)
@@ -142,12 +134,6 @@ class ElliotV8Port(BaseStrategy):
         if df_1m is None or len(df_1m) < 150:
             return no_exit()
 
-        # Max hold: free the slot when a trade has gone nowhere. Checked BEFORE
-        # the indicator work below, so it costs nothing when it fires.
-        if PORT_MAX_HOLD_MIN > 0:
-            if self.hold_minutes(position, df_1m) >= PORT_MAX_HOLD_MIN:
-                return make_exit(float(df_1m["close"].iloc[-1]), "MAX_HOLD")
-
         df_5m = df_1m.resample('5min', on='timestamp').agg({
             'open': 'first',
             'high': 'max',
@@ -193,4 +179,5 @@ class ElliotV8Port(BaseStrategy):
             return make_exit(float(df_1m['close'].iloc[-1]), "ELLIOT_SELL")
 
         return no_exit()
+
 

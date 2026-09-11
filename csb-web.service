@@ -1,5 +1,5 @@
 [Unit]
-Description=csb — Web Server Dashboard
+Description=csb — Crypto Scanner Web Dashboard
 After=network-online.target
 Wants=network-online.target
 
@@ -8,7 +8,7 @@ User=psms
 Group=psms
 WorkingDirectory=/home/psms/ubuntu/program_files/csb
 ExecStart=/home/psms/ubuntu/program_files/csb/venv/bin/python3 web_server.py
-Restart=always
+Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
@@ -17,4 +17,3 @@ Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
-

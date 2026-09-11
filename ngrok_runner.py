@@ -1,5 +1,5 @@
 """
-ngrok_runner.py - Ngrok Tunnel Management for CSB Quad-Core Bot (Port 8107)
+ngrok_runner.py - Ngrok Tunnel Management for CSB Quad-Core Bot (Port 8102)
 """
 
 import os
@@ -19,7 +19,7 @@ load_dotenv(os.path.join(_PROJECT, ".env"))
 
 NGROK_AUTHTOKEN = os.getenv("NGROK_AUTHTOKEN", "")
 NGROK_ENABLED = os.getenv("NGROK_ENABLED", "true").lower() == "true"
-ACTIVE_WEB_PORT = 8107
+ACTIVE_WEB_PORT = 8102
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -70,7 +70,7 @@ def get_active_ngrok_url(target_port: int = ACTIVE_WEB_PORT, force_refresh: bool
 
 
 def start_ngrok_tunnel(port: int = ACTIVE_WEB_PORT) -> Tuple[bool, str]:
-    """Establishes Ngrok tunnel targeting specified web port (8107)."""
+    """Establishes Ngrok tunnel targeting specified web port (8102)."""
     global ACTIVE_PUBLIC_URL, ACTIVE_NGROK_PROC
 
     existing_url = get_active_ngrok_url(port)

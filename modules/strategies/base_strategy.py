@@ -181,33 +181,6 @@ class BaseStrategy(ABC):
         except Exception:
             return None
 
-    @staticmethod
-    def hold_minutes(position: dict, df) -> float:
-        """Minutes the position has been open, measured against the DATA clock.
-
-        Uses the last bar's timestamp rather than wall-clock now(), so a
-        backtest replaying history measures the same thing live does.
-
-        pd.to_datetime, NOT datetime.fromisoformat: live stores entry_time as an
-        ISO string while the harness stores a pd.Timestamp, and fromisoformat()
-        raises TypeError on the latter. That exact mismatch meant CSM's max-hold
-        never fired in a backtest for months (see EXPERIMENT_LOG 16.3) — the
-        exception was swallowed and duration silently stayed 0.
-
-        Returns 0.0 when the duration cannot be determined, which makes a
-        max-hold check fail OPEN (no exit) rather than closing on bad data.
-        """
-        try:
-            entry_t = pd.to_datetime(position["entry_time"], utc=True)
-            bar_t = pd.to_datetime(
-                df["timestamp"].iloc[-1] if "timestamp" in getattr(df, "columns", [])
-                else df.index[-1],
-                utc=True,
-            )
-            return (bar_t - entry_t).total_seconds() / 60
-        except Exception:
-            return 0.0
-
     @classmethod
     def breakeven_trigger(cls, position: dict, fallback_pct: float) -> float:
         """

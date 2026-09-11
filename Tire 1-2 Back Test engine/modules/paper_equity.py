@@ -135,3 +135,4 @@ def reset(starting: float) -> None:
     _save(_blank(starting))
     log.info(f"Paper equity tracker reset to ${starting:.2f}")
 
+

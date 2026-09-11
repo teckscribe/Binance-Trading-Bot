@@ -16,3 +16,4 @@ pyngrok==7.1.6         # Ngrok tunnel manager
 aiohttp                # ngrok_runner notifications (was only present transitively via discord.py)
 pyotp                  # dashboard Settings tab 2FA (Google Authenticator)
 qrcode                 # terminal QR for dashboard_2fa_setup.py (optional)
+

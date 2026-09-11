@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import time
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 def fetch_binance_futures_klines(symbol, interval, start_time_ms, end_time_ms, limit=1500):
     """
@@ -77,7 +77,7 @@ def main():
     print(f"Fetching data for {len(symbols)} symbols: {symbols}")
     
     # Fetch last 30 days
-    end_date = datetime.now(timezone.utc)
+    end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=30)
     
     start_time_ms = int(start_date.timestamp() * 1000)

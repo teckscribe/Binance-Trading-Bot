@@ -47,7 +47,7 @@ log = logging.getLogger("AuthManager")
 # Signing is unaffected — it is per-request (timestamp + HMAC); the session only
 # manages the transport, so there is no shared auth state to race.
 SESSION = requests.Session()
-_adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
+_adapter = HTTPAdapter(pool_connections=30, pool_maxsize=30)
 SESSION.mount("https://", _adapter)
 SESSION.mount("http://", _adapter)
 
@@ -346,5 +346,12 @@ def api_headers() -> dict:
 def public_headers() -> dict:
     """Headers for public (unauthenticated) endpoints."""
     return {"Content-Type": "application/json"}
+
+
+def get_session() -> requests.Session:
+    """Return the shared pooled requests.Session instance."""
+    return SESSION
+
+
 
 

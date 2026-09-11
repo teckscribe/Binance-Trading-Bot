@@ -44,9 +44,26 @@ log = logging.getLogger("Watchlist")
 # --- Constants ----------------------------------------------------------------
 WATCHLIST_SIZE   = 20      # symbols kept in priority watchlist (normal mode)
 FOCUSED_SIZE     = 5       # symbols used as full universe in focused mode
-REFRESH_HOURS    = 24
+REFRESH_HOURS    = 8          # fixed UTC windows: 00:00, 08:00, 16:00
 MIN_VOLUME_USDT  = 1_000_000   # $1M/day floor
 MIN_PRICE        = 0.001
+# Minimum listing age. 90 -> 30 (2026-08-30, by decision).
+#
+# Read from Binance exchangeInfo `onboardDate`; 0 disables the filter, and a
+# symbol with no onboardDate is KEPT (fails open).
+#
+# WHAT LOOSENING THIS ADMITS. Newly-listed perps are exactly the high-ATR
+# movers CSM's momentum band fires on, so this raises signal volume — but the
+# coins it lets in were NOT in any backtest behind the current config:
+#   - the 90d datasets were built from symbols already past 90 days, so no
+#     measured expectancy covers the 30-90 day cohort
+#   - new listings have thinner books than the 0.03%/side slippage modelled
+#   - CSM is currently SHORT-only, and a new listing's early move is often a
+#     violent pump, which a short is on the wrong side of
+# Measured on the 30d set, only 4 of 18 traded symbols were under 90 days, so
+# the filter was not costing much volume at the time.
+MIN_COIN_AGE_DAYS = int(os.getenv("MIN_COIN_AGE_DAYS", "30"))
+MIN_RANGE_PCT    = 0.04        # 4% minimum 24h range — skip stable coins
 
 EXCLUDED_BASES = {
     # Stablecoins
@@ -139,13 +156,22 @@ def _fetch_crypto_symbol_set() -> set[str]:
         return set()
 
     crypto = set()
+    too_new = []
+    now_ms = time.time() * 1000
+    age_ms = MIN_COIN_AGE_DAYS * 86400 * 1000
     for sym in data.get("symbols", []):
         if (sym.get("underlyingType") == "COIN"
                 and sym.get("contractType") == "PERPETUAL"
                 and sym.get("status") == "TRADING"
                 and sym.get("symbol", "").endswith("USDT")):
+            onboard = sym.get("onboardDate", 0)
+            if age_ms > 0 and onboard and (now_ms - onboard) < age_ms:
+                too_new.append(sym["symbol"])
+                continue
             crypto.add(sym["symbol"])
 
+    if too_new:
+        log.info(f"Exchange info: filtered {len(too_new)} coins younger than {MIN_COIN_AGE_DAYS}d: {too_new[:10]}")
     log.info(f"Exchange info: {len(crypto)} pure-crypto USDT perpetuals found")
     return crypto
 
@@ -193,11 +219,15 @@ def _fetch_top_by_volume(n: int) -> list[str]:
             continue
 
         try:
-            price  = float(t.get("lastPrice",   "0") or "0")
-            volume = float(t.get("quoteVolume",  "0") or "0")
+            price    = float(t.get("lastPrice",   "0") or "0")
+            volume   = float(t.get("quoteVolume",  "0") or "0")
+            high_24h = float(t.get("highPrice",    "0") or "0")
+            low_24h  = float(t.get("lowPrice",     "0") or "0")
         except (ValueError, TypeError):
             continue
         if price < MIN_PRICE or volume < MIN_VOLUME_USDT:
+            continue
+        if low_24h > 0 and (high_24h - low_24h) / low_24h < MIN_RANGE_PCT:
             continue
         qualified.append((symbol, volume))
 
@@ -207,16 +237,32 @@ def _fetch_top_by_volume(n: int) -> list[str]:
 
 # --- Public API ---------------------------------------------------------------
 
+def _is_stale(saved_at: float) -> bool:
+    """True if saved_at falls in an earlier UTC window than now.
+
+    Windows are fixed 8-hour slots: 00-08, 08-16, 16-24 UTC.
+    A refresh at 07:59 becomes stale at 08:00; one at 08:01 stays
+    fresh until 16:00.
+    """
+    now = datetime.now(timezone.utc)
+    current_window = now.hour // REFRESH_HOURS
+    if saved_at <= 0:
+        return True
+    saved = datetime.fromtimestamp(saved_at, tz=timezone.utc)
+    if saved.date() != now.date():
+        return True
+    return saved.hour // REFRESH_HOURS != current_window
+
+
 def get_watchlist() -> list[str]:
     """
     Return the current watchlist (top-20 by volume + manual adds).
-    Auto-refreshes from Binance if data is older than REFRESH_HOURS.
+    Auto-refreshes at fixed UTC windows (00:00, 08:00, 16:00).
     Falls back to stale cache on API failure.
     """
-    data  = _load()
-    age_h = (time.time() - data.get("saved_at", 0)) / 3600
+    data = _load()
 
-    if age_h >= REFRESH_HOURS or not data.get("symbols"):
+    if _is_stale(data.get("saved_at", 0)) or not data.get("symbols"):
         refreshed = _fetch_top_by_volume(WATCHLIST_SIZE)
         if refreshed:
             data["symbols"]    = refreshed
@@ -263,11 +309,9 @@ def get_focused_watchlist(n: int = FOCUSED_SIZE) -> list[str]:
     Returns:
         List of symbols. Manual adds may push total above n.
     """
-    data  = _load()
-    age_h = (time.time() - data.get("saved_at", 0)) / 3600
+    data = _load()
 
-    # Refresh the auto list if stale or if we need more symbols than cached
-    if age_h >= REFRESH_HOURS or len(data.get("symbols", [])) < n:
+    if _is_stale(data.get("saved_at", 0)) or len(data.get("symbols", [])) < n:
         refreshed = _fetch_top_by_volume(max(WATCHLIST_SIZE, n))
         if refreshed:
             data["symbols"]    = refreshed
@@ -354,6 +398,5 @@ def get_watchlist_info() -> dict:
         "updated_at":     data.get("updated_at", "never"),
         "source":         data.get("source", "none"),
     }
-
 
 

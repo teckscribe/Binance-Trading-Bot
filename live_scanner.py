@@ -82,6 +82,7 @@ from modules.risk_engine       import (
 )
 from modules.order_engine      import (
     OrderEngine, LIVE_ENABLED, get_account_equity, update_stop_order,
+    preload_exchange_specs,
 )
 from modules                   import paper_equity
 from modules.strategies.strategy_factory import StrategyFactory
@@ -1392,6 +1393,9 @@ def main() -> None:
         symbols = _wl + [s for s in symbols if s not in _wl_set]
         log.info(f"Symbol list loaded: {len(symbols)} symbols ({len(_wl)} watchlist priority)")
 
+    # Preload contract LOT_SIZE stepSize & PRICE_FILTER tickSize for fast 0ms order execution
+    preload_exchange_specs(symbols)
+
     # LLM advisor background thread removed 2026-08-11 — see docs/LLM_REMOVED.md.
 
     btc_ref = fetch_btc_reference()
@@ -1929,4 +1933,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 

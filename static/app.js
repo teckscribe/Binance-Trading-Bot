@@ -751,3 +751,4 @@ document.getElementById('set-reset')?.addEventListener('click', () => {
     fetchSettings();
     setStatus("Changes discarded.");
 });
+

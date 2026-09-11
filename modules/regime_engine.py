@@ -481,8 +481,8 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True, "ELLIOT_V8": True},
-    "BEAR_TREND":  {"CSM": False, "NASOS_V4": True, "ELLIOT_V8": True},
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True, "ELLIOT_V8": False},
+    "BEAR_TREND":  {"CSM": True, "NASOS_V4": True, "ELLIOT_V8": False},
     "RANGING":     {"CSM": True, "NASOS_V4": False, "ELLIOT_V8": False},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
@@ -496,5 +496,6 @@ REGIME_STRATEGY_PERMISSIONS = {
 
 def is_strategy_permitted(regime, strategy_id):
     return REGIME_STRATEGY_PERMISSIONS.get(regime, {}).get(strategy_id, False)
+
 
 

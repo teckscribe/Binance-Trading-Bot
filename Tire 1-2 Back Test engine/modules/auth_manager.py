@@ -25,6 +25,7 @@ import hashlib
 import time
 import logging
 import requests
+from requests.adapters import HTTPAdapter
 from urllib.parse import urlencode
 
 from dotenv import load_dotenv
@@ -32,6 +33,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 log = logging.getLogger("AuthManager")
+
+# ─── Shared HTTP session (connection pooling / keep-alive) ────────────────────
+# One pooled Session for every call to fapi.binance.com, imported and reused by
+# data_feed and order_engine.  Plain requests.get/post opens a fresh TCP+TLS
+# connection per call; on the scan hot path (100s of klines/cycle through a
+# 10-worker pool) and on the order path (where handshake latency = slippage)
+# that per-call handshake is pure waste.  A shared pool reuses the connection.
+#
+# Thread-safe: requests.Session / urllib3's pool are safe for concurrent
+# requests.  pool_maxsize (20) is set >= data_hub's MAX_CONCURRENT (10) so the
+# thread pool never forces a new connection or logs "connection pool is full".
+# Signing is unaffected — it is per-request (timestamp + HMAC); the session only
+# manages the transport, so there is no shared auth state to race.
+SESSION = requests.Session()
+_adapter = HTTPAdapter(pool_connections=30, pool_maxsize=30)
+SESSION.mount("https://", _adapter)
+SESSION.mount("http://", _adapter)
 
 API_KEY    = os.getenv("BINANCE_API_KEY",    "")
 API_SECRET = os.getenv("BINANCE_API_SECRET", "")
@@ -83,7 +101,7 @@ def test_binance_connection() -> dict:
 
     # ── 1. Network ping ───────────────────────────────────────────────────────
     try:
-        resp = requests.get(BASE_URL + "/fapi/v1/ping", timeout=5)
+        resp = SESSION.get(BASE_URL + "/fapi/v1/ping", timeout=5)
         if resp.status_code != 200:
             issues.append(f"Binance FAPI unreachable — ping returned {resp.status_code}")
             return {"ok": False, "issues": issues, "info": info}
@@ -94,7 +112,7 @@ def test_binance_connection() -> dict:
     # ── 2. API key + Futures permissions ──────────────────────────────────────
     try:
         params = sign_params({})
-        resp   = requests.get(
+        resp   = SESSION.get(
             BASE_URL + "/fapi/v2/account",
             params  = params,
             headers = api_headers(),
@@ -133,7 +151,7 @@ def test_binance_connection() -> dict:
     # ── 3. Position mode: must be Hedge (dual side) ───────────────────────────
     try:
         params = sign_params({})
-        resp   = requests.get(
+        resp   = SESSION.get(
             BASE_URL + "/fapi/v1/positionSide/dual",
             params  = params,
             headers = api_headers(),
@@ -253,7 +271,7 @@ def sync_server_time(force: bool = False) -> int:
 
     try:
         t0   = time.time() * 1000
-        resp = requests.get(BASE_URL + "/fapi/v1/time", timeout=10)
+        resp = SESSION.get(BASE_URL + "/fapi/v1/time", timeout=10)
         t1   = time.time() * 1000
         server = int(resp.json()["serverTime"])
         # Midpoint of the round trip approximates our clock at reply time.
@@ -295,11 +313,11 @@ def sign_params(params: dict) -> dict:
 
     Usage (GET):
         p = sign_params({"symbol": "BTCUSDT"})
-        resp = requests.get(BASE_URL + path, params=p, headers=api_headers())
+        resp = SESSION.get(BASE_URL + path, params=p, headers=api_headers())
 
     Usage (POST):
         p = sign_params({"symbol": "BTCUSDT", "leverage": "5"})
-        resp = requests.post(BASE_URL + path, params=p, headers=api_headers())
+        resp = SESSION.post(BASE_URL + path, params=p, headers=api_headers())
 
     Args:
         params : Dict of request parameters (without timestamp or signature).
@@ -328,5 +346,12 @@ def api_headers() -> dict:
 def public_headers() -> dict:
     """Headers for public (unauthenticated) endpoints."""
     return {"Content-Type": "application/json"}
+
+
+def get_session() -> requests.Session:
+    """Return the shared pooled requests.Session instance."""
+    return SESSION
+
+
 
 

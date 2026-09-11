@@ -25,7 +25,7 @@ from modules.data_feed import fetch_candles, fetch_funding_rate, fetch_open_inte
 log = logging.getLogger("DataHub")
 
 MAX_CONCURRENT = 10
-MIN_REQ_GAP    = 0.1
+MIN_REQ_GAP    = 0.025
 
 _req_lock = threading.Lock()
 _last_req  = [0.0]
@@ -108,7 +108,7 @@ def prune_1h_cache(keep: set) -> int:
 
 # ─── BTC reference cache ─────────────────────────────────────────────────────
 # BTC/ETH/SOL 1h + funding + OI for regime classification.  The 1h bars change
-# once per hour and funding/OI update every ~8h/5m respectively.  A 300s TTL
+# once per hour and funding/OI update every ~8h/5m respectively.  A 60s TTL
 # avoids re-fetching on every 60s scan cycle (saves 5 API calls × ~4 reuses).
 _BTC_REF_TTL   = max(60, int(os.getenv("BTC_REF_CACHE_TTL_SEC", "60")))
 _btc_ref_cache = {"ts": 0.0, "data": None}
@@ -320,6 +320,7 @@ def fetch_active_positions_data(symbols: list) -> dict:
                 log.warning(f"Fast fetch failed [{sym}]: {exc}")
 
     return result
+
 
 
 
