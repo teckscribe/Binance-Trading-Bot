@@ -48,6 +48,9 @@ class KronosScorer:
         self.lb, self.pl = lb, pl
         self._tok = KronosTokenizer.from_pretrained(tok_id)
         self._mdl = Kronos.from_pretrained(mdl_id)
+        # Disable dropout layers for deterministic inference scoring
+        self._tok.eval()
+        self._mdl.eval()
         self._pred = KronosPredictor(self._mdl, self._tok, device=device, max_context=512)
 
     def score_window(self, ctx15, direction):

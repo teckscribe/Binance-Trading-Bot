@@ -37,12 +37,13 @@ kronos/logs/
 .DS_Store
 
 # ── Market data caches — large, regenerable, never source ────────────────────
-data/
-data/*
+data/*.csv
+data/**/*.csv
+data/*.parquet
+data/**/*.parquet
 
 # ── Backtest Engine ──────────────────────────────────────────────────────────
 Tire 1-2 Back Test engine/
-"Tire 1-2 Back Test engine"/
 
 **/prep_cache.pkl
 *.pkl

@@ -39,8 +39,11 @@ KLINES = "https://fapi.binance.com/fapi/v1/klines"
 _Q = pd.Timedelta(minutes=15)
 
 
-def _fetch_15m(symbol, limit=400):
-    q = urllib.parse.urlencode({"symbol": symbol.upper(), "interval": "15m", "limit": limit})
+def _fetch_15m(symbol, limit=400, end_time_ms=None):
+    params = {"symbol": symbol.upper(), "interval": "15m", "limit": limit}
+    if end_time_ms is not None:
+        params["endTime"] = end_time_ms
+    q = urllib.parse.urlencode(params)
     with urllib.request.urlopen(f"{KLINES}?{q}", timeout=10) as r:
         raw = json.load(r)
     rows = []
@@ -77,9 +80,15 @@ def _append(rec):
 
 
 def score_request(sc, req):
-    df = _fetch_15m(req["symbol"])
+    # Normalize timestamp to naive UTC (Binance kline close_time is UTC)
+    _raw_ts = pd.Timestamp(req["ts"])
+    if _raw_ts.tz is not None:
+        ts = _raw_ts.tz_convert("UTC").tz_localize(None)
+    else:
+        ts = _raw_ts
+    end_ms = int(ts.timestamp() * 1000)
+    df = _fetch_15m(req["symbol"], end_time_ms=end_ms)
     # leak-free: keep only bars fully closed at/before the candidate timestamp
-    ts = pd.Timestamp(req["ts"]).tz_localize(None) if pd.Timestamp(req["ts"]).tz else pd.Timestamp(req["ts"])
     ctx = df[df["close_time"] <= ts]
     ctx = ctx[["open", "high", "low", "close", "volume", "amount"]]
     s = sc.score_window(ctx, req["direction"])
@@ -98,6 +107,12 @@ def main():
     while True:
         try:
             if os.path.exists(REQ):
+                # Guard against file truncation/rotation: if file shrunk,
+                # reset offset to re-read from the beginning
+                fsize = os.path.getsize(REQ)
+                if fsize < off:
+                    print(f"[shadow] file truncated ({off} > {fsize}), resetting offset", flush=True)
+                    off = 0
                 with open(REQ) as f:
                     f.seek(off)
                     for line in f:

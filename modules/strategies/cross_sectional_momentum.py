@@ -12,7 +12,7 @@ ACTIVE DEFAULT = CONFIG A.
     band 3.0-4.0 | LONG + SHORT | RANGING only
     ladder: stage 1 (+1.0% -> +0.15%) on bar close
             stage 2 (+2.5% -> +1.50%) & stage 3 (+4.0% -> +2.50%) on peak HWM
-    SL 2.0xATR(15m) (floor 2%) | TP 4.0xATR | max hold 240 min
+    SL 2.0xATR(15m) (floor 2%) | TP 4.0xATR | max hold 1440 min
 
     ── CONFIG B (alternative) ───────────────────────────────────────────────
     band 3.0-4.0 | SHORT only | RANGING only | NO stop ratchet
@@ -147,11 +147,13 @@ class CrossSectionalMomentum(BaseStrategy):
         # Normalized momentum (how many ATRs did it move in 24h)
         normalized_mom = price_change / atr_1h if atr_1h > 0 else 0
 
-        # Volume expansion filter: check if breakout volume confirms the move
+        # Volume expansion filter: use the last COMPLETED 1h candle (iloc[-2])
+        # to avoid comparing an in-progress candle against full-hour averages,
+        # which would block entries for the first 30-45 min of every hour.
         vol_ratio = 1.0
-        if 'volume' in df_1h.columns:
-            vol_1h = float(df_1h['volume'].iloc[-1])
-            avg_vol_24h = float(df_1h['volume'].iloc[-25:-1].mean()) if len(df_1h) >= 25 else 0.0
+        if 'volume' in df_1h.columns and len(df_1h) >= 26:
+            vol_1h = float(df_1h['volume'].iloc[-2])           # last completed candle
+            avg_vol_24h = float(df_1h['volume'].iloc[-26:-2].mean())   # 24 completed candles before it
             if avg_vol_24h > 0:
                 vol_ratio = vol_1h / avg_vol_24h
             if VOL_RATIO_MIN > 0 and avg_vol_24h > 0 and vol_1h < (VOL_RATIO_MIN * avg_vol_24h):
@@ -264,10 +266,26 @@ class CrossSectionalMomentum(BaseStrategy):
         # ── High-water mark tracking (Peak Favourable Excursion) ────────────
         # df.iloc[-1] contains the live mark/tick price on fast cycles.
         # Track the peak favourable move since entry.
+        # GUARD: On the entry candle, pre-fill extremes could leak into HWM
+        # and trigger phantom stop-outs.  Clamp to current_price if the bar
+        # overlaps with entry_time.
         try:
             _bar = df.iloc[-1]
             _px_hi = float(_bar["high"])
             _px_lo = float(_bar["low"])
+            # Check if this bar overlaps with entry time (entry candle guard)
+            _bar_ts = _bar.get("timestamp", _bar.name if hasattr(_bar, "name") else None)
+            if _bar_ts is not None:
+                try:
+                    _bar_ts = pd.to_datetime(_bar_ts, utc=True)
+                    _entry_ts = pd.to_datetime(position["entry_time"], utc=True)
+                    # If the bar timestamp <= entry_time, this is the entry candle
+                    # — clamp extremes to current_price to avoid pre-fill leakage
+                    if _bar_ts <= _entry_ts:
+                        _px_hi = max(current_price, entry_price)
+                        _px_lo = min(current_price, entry_price)
+                except Exception:
+                    pass
         except Exception:
             _px_hi = _px_lo = current_price
 
