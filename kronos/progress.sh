@@ -19,7 +19,11 @@ done
 echo
 echo "-- collection (queue vs consumers; equal = fully caught up) --"
 for f in shadow_requests shadow_scores whale_scores; do
-  n=$(wc -l < "$L/$f.jsonl" 2>/dev/null || echo 0)
+  if [ -f "$L/$f.jsonl" ]; then
+    n=$(wc -l < "$L/$f.jsonl" 2>/dev/null || echo 0)
+  else
+    n=0
+  fi
   printf "  %-18s %s rows\n" "$f" "$n"
 done
 
