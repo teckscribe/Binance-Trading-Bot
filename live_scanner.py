@@ -1048,6 +1048,17 @@ def _scan_for_signals(
                         near_misses[sid] = sig
                 elif sig.get("strength", 1.0) >= MIN_STRENGTH:
                     candidates.append(sig)
+                    if _sid == "CSM":
+                        try:
+                            from kronos.shadow_client import log_candidate
+                            log_candidate(
+                                sig.get("symbol"),
+                                sig.get("direction"),
+                                sig.get("entry_price"),
+                                sig.get("strength"),
+                            )
+                        except Exception:
+                            pass
             except Exception as exc:
                 log.warning(f"scan() exception [{sym} {strategy.STRATEGY_ID}]: {exc}")
 
