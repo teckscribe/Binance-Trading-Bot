@@ -1,0 +1,20 @@
+[Unit]
+Description=csb — Web Server Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=psms
+Group=psms
+WorkingDirectory=/home/psms/ubuntu/program_files/csb
+ExecStart=/home/psms/ubuntu/program_files/csb/venv/bin/python3 web_server.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=csb-web
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+

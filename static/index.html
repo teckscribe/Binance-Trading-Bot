@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Future Trader</title>
+    <link rel="stylesheet" href="/static/style.css?v=__ASSETV__">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Top Header Navigation -->
+        <header>
+            <div class="logo-area">
+                <h1><span class="logo-icon">⚡</span> Crypto Future Trader</h1>
+                <p>Institutional USDS-M Perpetual Futures Trade Engine</p>
+            </div>
+            <div class="header-badges">
+                <!-- PAPER vs LIVE. Simulated money must never look like real money. -->
+                <div class="badge badge-mode" id="trade-mode-badge">MODE --</div>
+                <div class="badge badge-port" id="server-status-badge">ONLINE 🟢</div>
+            </div>
+        </header>
+
+        <!-- Tab bar -->
+        <div class="tabbar">
+            <button class="tab-btn active" data-tab="live">📈 Live Trading</button>
+            <button class="tab-btn" data-tab="perf">📊 Performance</button>
+            <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
+        </div>
+
+        <div id="tab-live">
+
+        <!-- Top Metric Cards Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card" style="border-left-color: #A78BFA;">
+                <div class="metric-label">WALLET BALANCE</div>
+                <div class="metric-value" id="wallet-balance">$0.00</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #10B981;">
+                <div class="metric-label">NET P&L</div>
+                <div class="metric-value" id="net-pnl">0.00%</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #8B5CF6;">
+                <div class="metric-label">OPEN POSITIONS</div>
+                <div class="metric-value" id="active-count">0</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #3B82F6;">
+                <div class="metric-label">SYSTEM STATUS</div>
+                <div class="metric-value" id="bot-status">SCANNING</div>
+            </div>
+            <div class="metric-card" style="border-left-color: #F59E0B;">
+                <div class="metric-label">LAST UPDATE</div>
+                <div class="metric-value" id="last-update">--</div>
+            </div>
+        </div>
+
+        <!-- Institutional ML Strategy & Risk Engine Panel -->
+        <div class="ai-panel">
+            <div class="ai-header">
+                <h3>🧠 Multi-Strategy Regime Engine <span id="strategy-count" style="opacity:.6;font-size:.8em;"></span></h3>
+                <span class="ai-badge" id="ai-regime">UNKNOWN 🛡️</span>
+            </div>
+            <!-- Populated from /api/strategies (StrategyFactory) so this panel
+                 cannot drift out of sync with what actually trades. -->
+            <div class="ai-grid" id="strategy-grid">
+                <div class="ai-card">
+                    <div class="ai-title">Loading strategies…</div>
+                    <div class="ai-val" style="color: #94A3B8;">—</div>
+                    <div class="ai-sub">Reading engine configuration</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Positions Table Section -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>💼 Active Open Futures Positions</h3>
+            </div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Strategy</th>
+                            <th>Entry Price</th>
+                            <th>Leverage</th>
+                            <th>Position Size</th>
+                            <th>Margin Used</th>
+                            <th>PNL(ROI %)</th>
+                            <th>Target SL</th>
+                            <th>Duration (min)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-tbody">
+                        <tr>
+                            <td colspan="11" class="empty-msg">No active open positions. Auto-trader scanning market...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- AI Trade History Ledger Section -->
+        <div class="table-section">
+            <div class="table-header">
+                <h3>📜 Live Session Trade Ledger (Recent)</h3>
+            </div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Time (IST)</th>
+                            <th>Mode</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Strategy</th>
+                            <th>Position Size</th>
+                            <th>Entry Price</th>
+                            <th>Exit Price</th>
+                            <th>Reason</th>
+                            <th>Realized P&L</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="decisions-tbody">
+                        <tr>
+                            <td colspan="11" class="empty-msg">No closed trades yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        </div><!-- /tab-live -->
+
+        <!-- ═══ PERFORMANCE TAB ═══════════════════════════════════════════ -->
+        <div id="tab-perf" style="display:none;">
+
+            <!-- Which trades these totals cover. Scoped to the current equity
+                 period so Net P&L agrees with the wallet balance above. -->
+            <div class="hint" id="perf-scope" style="display:block;margin:0 0 16px 2px;">loading…</div>
+
+            <div class="metrics-grid">
+                <div class="metric-card" style="border-left-color:#A78BFA;">
+                    <div class="metric-label">TOTAL TRADES</div>
+                    <div class="metric-value" id="pf-trades">0</div>
+                </div>
+                <div class="metric-card" style="border-left-color:#10B981;">
+                    <div class="metric-label">NET P&L</div>
+                    <div class="metric-value" id="pf-net">$0.00</div>
+                </div>
+                <div class="metric-card" style="border-left-color:#3B82F6;">
+                    <div class="metric-label">WIN RATE</div>
+                    <div class="metric-value" id="pf-winrate">0%</div>
+                </div>
+                <div class="metric-card" style="border-left-color:#8B5CF6;">
+                    <div class="metric-label">PROFIT FACTOR</div>
+                    <div class="metric-value" id="pf-factor">0.00</div>
+                </div>
+                <div class="metric-card" style="border-left-color:#F59E0B;">
+                    <div class="metric-label">TOP TRADE = % OF PROFIT</div>
+                    <div class="metric-value" id="pf-topshare">0%</div>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header"><h3>🧠 Performance by Strategy</h3></div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Strategy</th><th>Trades</th><th>Win Rate</th>
+                            <th>Profit Factor</th><th>Avg Win</th><th>Avg Loss</th>
+                            <th>Expectancy</th><th>Top Trade Share</th><th>Net P&L</th>
+                        </tr></thead>
+                        <tbody id="perf-strategy-tbody">
+                            <tr><td colspan="9" class="empty-msg">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header">
+                    <h3>🪙 Performance by Coin</h3>
+                    <span class="hint">worst first — blacklist candidates at the top</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Symbol</th><th>Trades</th><th>Win Rate</th>
+                            <th>Profit Factor</th><th>Avg Win</th><th>Avg Loss</th>
+                            <th>Expectancy</th><th>Net P&L</th>
+                        </tr></thead>
+                        <tbody id="perf-symbol-tbody">
+                            <tr><td colspan="8" class="empty-msg">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header"><h3>🚪 Exit Reason Breakdown</h3></div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Reason</th><th>Trades</th><th>Share</th><th>Net P&L</th>
+                        </tr></thead>
+                        <tbody id="perf-exit-tbody">
+                            <tr><td colspan="4" class="empty-msg">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-section">
+                <div class="table-header"><h3>📉 Cumulative P&L</h3></div>
+                <div class="table-container">
+                    <svg id="perf-curve" viewBox="0 0 1000 220"
+                         preserveAspectRatio="none"
+                         style="width:100%;height:220px;display:block;"></svg>
+                </div>
+            </div>
+
+        </div><!-- /tab-perf -->
+
+        <div id="tab-settings" style="display:none;">
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>&#9881;&#65039; Bot Settings</h2>
+                    <span id="set-lock" class="pill"></span>
+                </div>
+                <p class="set-note" id="set-reason"></p>
+                <p class="set-note set-note-dim" id="set-excluded"></p>
+
+                <div id="set-groups"></div>
+
+                <div class="set-actions">
+                    <div class="set-otp">
+                        <label for="set-otp-input">Google Authenticator code</label>
+                        <input id="set-otp-input" type="text" inputmode="numeric"
+                               autocomplete="one-time-code" maxlength="6"
+                               placeholder="000000">
+                    </div>
+                    <div class="set-buttons">
+                        <button id="set-reset" class="btn-secondary">Discard changes</button>
+                        <button id="set-save" class="btn-primary">Save changes</button>
+                    </div>
+                </div>
+                <p class="set-status" id="set-status"></p>
+            </div>
+
+        </div><!-- /tab-settings -->
+
+    </div>
+
+    <script src="/static/app.js?v=__ASSETV__"></script>
+</body>
+</html>

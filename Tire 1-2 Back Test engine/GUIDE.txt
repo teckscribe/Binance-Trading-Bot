@@ -1,0 +1,289 @@
+================================================================
+     CSB - Tire 1-2 Back Test Engine
+     Standalone Setup & Operating Guide
+================================================================
+
+
+FOLDER STRUCTURE
+----------------------------------------------------------------
+
+  Tire 1-2 Back Test engine\
+  |
+  |-- BAT FILES (double-click to run)
+  |   |-- setup_venv.bat        Create virtual environment
+  |   |-- fetch_data.bat        Download 1m data from Binance
+  |   |-- run_tier1.bat         Run Tier 1 backtest (15m, fast)
+  |   |-- run_tier2.bat         Run Tier 2 replay (1m, faithful)
+  |   |-- analyze.bat           Analyze Tier 2 results
+  |   |-- run_dashboard.bat     Start web dashboard
+  |   |-- run_overnight.sh      Unattended overnight run (Ubuntu)
+  |
+  |-- PYTHON FILES
+  |   |-- backtest_optimizer.py     Tier 1 engine
+  |   |-- backtest_server.py        Web dashboard server
+  |   |-- live_scanner.py           Live scanner (used by Tier 2)
+  |   |-- live_logger.py            Logger
+  |   |-- telegram_notifier.py      Telegram (stub for replay)
+  |   |-- discord_notifier.py       Discord (stub for replay)
+  |
+  |-- modules\                  Core trading modules
+  |   |-- risk_engine.py
+  |   |-- regime_engine.py
+  |   |-- order_engine.py
+  |   |-- data_hub.py
+  |   |-- data_feed.py
+  |   |-- paper_equity.py
+  |   |-- ml_engine.py
+  |   |-- watchlist.py
+  |   |-- symbol_filter.py
+  |   |-- symbol_blacklist.py
+  |   |-- blacklist.py
+  |   |-- auth_manager.py
+  |   |-- strategy_overrides.py
+  |   |-- strategies\
+  |       |-- base_strategy.py
+  |       |-- strategy_factory.py
+  |       |-- cross_sectional_momentum.py
+  |       |-- volatility_risk_premium.py
+  |       |-- liquidation_cascades.py
+  |       |-- trend_pullback.py
+  |       |-- funding_fade_v2.py
+  |       |-- grid_strategy.py
+  |
+  |-- tools\
+  |   |-- fetch_1m.py           Data fetcher from Binance
+  |   |-- replay\
+  |       |-- driver.py         Tier 2 replay engine
+  |       |-- analyze.py        Results analyzer
+  |       |-- sandbox.py        Sandbox isolation
+  |       |-- store.py          Data store
+  |       |-- sync.py           Code sync checker
+  |
+  |-- data\                     Market data CSVs (auto-filled)
+  |   |-- funding\              Funding rate cache
+  |-- results\                  Tier 2 output JSONs
+  |-- logs\                     Replay logs
+  |-- .env                      Configuration
+  |-- requirements.txt          Python packages
+
+
+================================================================
+FIRST TIME SETUP
+================================================================
+
+  Step 1: Install Python 3.10+ if not already installed
+          https://www.python.org/downloads/
+
+  Step 2: Double-click setup_venv.bat
+          This creates .venv and installs all packages.
+
+  Step 3: Edit .env file — set these values:
+
+          ACCOUNT_EQUITY_USDT=100.00
+          MAX_CONCURRENT=3
+          MAX_TOTAL_MARGIN_PCT=0.80
+          LIVE_ENABLED=false
+
+  Step 4: You're ready to run backtests!
+
+
+================================================================
+TIER 1 - PORTFOLIO BACKTEST (15m bars, fast)
+================================================================
+
+  WHAT IT DOES:
+  - Simulates trading across 15m candles
+  - Portfolio-level risk model
+  - Shows Sharpe ratio, profit factor, regime breakdown
+  - Runs in seconds
+
+  HOW TO RUN:
+
+  Double-click run_tier1.bat for default settings, or
+  open CMD and run with custom flags:
+
+    cd "C:\Users\Anoop P\Claude\Tire 1-2 Back Test engine"
+
+    REM Default (30d, CSM+VRP+LIQ, reads .env settings)
+    run_tier1.bat
+
+    REM Last 7 days only
+    run_tier1.bat --days 30 --last-days 7
+
+    REM Single strategy test
+    run_tier1.bat --strategies CSM
+    run_tier1.bat --strategies VRP
+    run_tier1.bat --strategies LIQ
+
+    REM Custom capital
+    run_tier1.bat --days 30 --capital 200 --strategies CSM,VRP,LIQ
+
+    REM Without regime restrictions
+    run_tier1.bat --no-regime
+
+  ALL FLAGS:
+    --symbols SYMS       Comma-separated symbols
+    --strategies IDS     Comma-separated (CSM,VRP,LIQ,TP,FF_V2...)
+    --days N             CSV dataset period (files named *_{N}d.csv)
+    --last-days N        Score only trades from last N days
+    --capital N          Starting equity USDT
+    --leverage N         Leverage multiplier
+    --slots N            Max concurrent positions
+    --margin N           Max total margin fraction
+    --daily-cap N        Daily loss cap
+    --weekly-cap N       Weekly loss cap
+    --no-caps            Disable loss caps
+    --no-regime          Ignore regime engine
+    --crypto-only        Drop tokenised equities
+    --cache PATH         Save trades to JSON
+
+
+================================================================
+TIER 2 - LIVE REPLAY (1m bars, production-faithful)
+================================================================
+
+  WHAT IT DOES:
+  - Replays live_scanner's ACTUAL code over 1m historical data
+  - Same entry/exit/risk logic as production
+  - Minute-by-minute simulation
+  - Most accurate representation of live behavior
+  - Supports checkpointing and resume
+
+  STEP 1: FETCH DATA FIRST
+
+    Double-click fetch_data.bat for 30 days, or:
+
+    REM 30 days, full watchlist
+    fetch_data.bat
+
+    REM 7 days only
+    fetch_data.bat 7
+
+    REM Specific symbols
+    fetch_data.bat 30 BTCUSDT,ETHUSDT,SOLUSDT,APEUSDT
+
+    IMPORTANT: Always include BTCUSDT, ETHUSDT, SOLUSDT
+    (regime engine needs all three)
+
+  STEP 2: RUN REPLAY
+
+    Double-click run_tier2.bat for default settings, or:
+
+    REM Default (30d full replay, resume enabled)
+    run_tier2.bat
+
+    REM Last 7 days only
+    run_tier2.bat --last-days 7
+
+    REM Smoke test (first 2 hours)
+    run_tier2.bat --limit-hours 2
+
+    REM Specific symbols
+    run_tier2.bat --symbols BTCUSDT,ETHUSDT,SOLUSDT
+
+  STEP 3: ANALYZE RESULTS
+
+    analyze.bat results\replay_XXXXXXXX_XXXXXX.json
+
+  ALL FLAGS:
+    --days N               Which 1m dataset (*_1m_{N}d.csv)
+    --symbols SYMS         Comma-separated symbols
+    --equity N             Starting equity USDT
+    --last-days N          Replay only last N days
+    --limit-hours N        Replay only first N hours
+    --out PATH             Output trades JSON path
+    --resume               Continue from checkpoint
+    --checkpoint-every N   Save state every N sim minutes
+    --progress-every N     Log every N sim minutes (360=6h)
+    --data-dir PATH        Where CSVs live (default: data\)
+    --skip-drift-check     Allow modified code
+
+
+================================================================
+WEB DASHBOARD
+================================================================
+
+  Double-click run_dashboard.bat, then open:
+  http://localhost:8200
+
+  The dashboard shows:
+  - List of all backtest results with summary stats
+  - Click any result to see:
+    - Equity curve chart
+    - Per-strategy breakdown (trades, net, win%, PF)
+    - Per-symbol breakdown (top 20)
+    - Exit type distribution
+    - Daily P&L breakdown
+  - Current regime configuration
+  - Data availability status
+
+
+================================================================
+REGIME CONFIGURATION
+================================================================
+
+  Edit modules\regime_engine.py to change which strategies
+  trade in which market regime.
+
+  Current setup:
+    BULL_TREND   -> VRP only
+    BEAR_TREND   -> CSM + LIQ
+    RANGING      -> CSM + LIQ
+    OVERHEATED   -> nothing
+    OVERSOLD     -> nothing
+
+  To change, find REGIME_STRATEGY_PERMISSIONS dict and edit.
+  Both Tier 1 and Tier 2 read this at runtime.
+
+
+================================================================
+QUICK RECIPES
+================================================================
+
+  A. "Quick strategy screen"
+     run_tier1.bat --strategies CSM,VRP,LIQ
+
+  B. "Is CSM profitable alone?"
+     run_tier1.bat --strategies CSM
+
+  C. "Full production replay"
+     fetch_data.bat
+     run_tier2.bat
+     analyze.bat results\replay_*.json
+
+  D. "Quick 7-day check after code change"
+     run_tier2.bat --last-days 7
+     analyze.bat results\replay_*.json
+
+  E. "Compare with vs without regime"
+     run_tier1.bat --strategies CSM,VRP,LIQ
+     run_tier1.bat --strategies CSM,VRP,LIQ --no-regime
+
+
+================================================================
+IMPORTANT NOTES
+================================================================
+
+  1. This is a STANDALONE project. It does NOT depend on
+     the main CSB folder. All code is self-contained here.
+
+  2. LIVE_ENABLED must be false in .env. This folder is
+     for backtesting only, never live trading.
+
+  3. Tier 2 uses --skip-drift-check by default since this
+     is a separate copy from production.
+
+  4. Results are timestamped so old runs are never overwritten.
+
+  5. The .env file controls equity, concurrent slots, and
+     margin — edit it to test different configurations.
+
+  6. To test a NEW strategy:
+     a. Add the strategy file to modules\strategies\
+     b. Register it in strategy_factory.py
+     c. Add it to REGIME_STRATEGY_PERMISSIONS
+     d. Screen with Tier 1, confirm with Tier 2
+
+================================================================
+                  Last updated: 2026-08-13
+================================================================

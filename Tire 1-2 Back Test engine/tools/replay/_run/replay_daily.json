@@ -1,0 +1,112 @@
+[
+ {
+  "date": "2026-05-20",
+  "trades": 3,
+  "net_usdt": 4.0224,
+  "cum_net_usdt": 4.0224,
+  "equity": 104.0224,
+  "win_pct": 66.7,
+  "exit_mix": {
+   "TP_HIT": 2,
+   "BE_HIT": 1
+  }
+ },
+ {
+  "date": "2026-05-21",
+  "trades": 13,
+  "net_usdt": -0.4237,
+  "cum_net_usdt": 3.5987,
+  "equity": 103.5987,
+  "win_pct": 38.5,
+  "exit_mix": {
+   "BE_HIT": 2,
+   "SL_HIT": 5,
+   "TRAIL_HIT": 3,
+   "TP_HIT": 2,
+   "MAX_HOLD": 1
+  }
+ },
+ {
+  "date": "2026-05-22",
+  "trades": 15,
+  "net_usdt": -3.2999,
+  "cum_net_usdt": 0.2988,
+  "equity": 100.2988,
+  "win_pct": 20.0,
+  "exit_mix": {
+   "SL_HIT": 8,
+   "MAX_HOLD": 2,
+   "TP_HIT": 3,
+   "BE_HIT": 2
+  }
+ },
+ {
+  "date": "2026-05-23",
+  "trades": 9,
+  "net_usdt": 0.2098,
+  "cum_net_usdt": 0.5086,
+  "equity": 100.5086,
+  "win_pct": 44.4,
+  "exit_mix": {
+   "MAX_HOLD": 3,
+   "SL_HIT": 4,
+   "BE_HIT": 1,
+   "TRAIL_HIT": 1
+  }
+ },
+ {
+  "date": "2026-05-24",
+  "trades": 4,
+  "net_usdt": -4.7053,
+  "cum_net_usdt": -4.1967,
+  "equity": 95.8033,
+  "win_pct": 0.0,
+  "exit_mix": {
+   "SL_HIT": 4
+  }
+ },
+ {
+  "date": "2026-05-25",
+  "trades": 9,
+  "net_usdt": -1.3608,
+  "cum_net_usdt": -5.5575,
+  "equity": 94.4425,
+  "win_pct": 33.3,
+  "exit_mix": {
+   "BE_HIT": 2,
+   "SL_HIT": 4,
+   "MAX_HOLD": 1,
+   "TRAIL_HIT": 1,
+   "TP_HIT": 1
+  }
+ },
+ {
+  "date": "2026-05-26",
+  "trades": 18,
+  "net_usdt": -2.3674,
+  "cum_net_usdt": -7.9249,
+  "equity": 92.0751,
+  "win_pct": 27.8,
+  "exit_mix": {
+   "SL_HIT": 4,
+   "BE_HIT": 8,
+   "MAX_HOLD": 2,
+   "TRAIL_HIT": 4
+  }
+ },
+ {
+  "date": "2026-05-27",
+  "trades": 9,
+  "net_usdt": 2.2053,
+  "cum_net_usdt": -5.7196,
+  "equity": 94.2804,
+  "win_pct": 44.4,
+  "exit_mix": {
+   "TRAIL_HIT": 1,
+   "TP_HIT": 2,
+   "SL_HIT": 2,
+   "MAX_HOLD": 2,
+   "BE_HIT": 2
+  }
+ }
+]

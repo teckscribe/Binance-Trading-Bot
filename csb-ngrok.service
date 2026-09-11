@@ -1,0 +1,14 @@
+[Unit]
+Description=csb — Ngrok Tunnel (Zero-Conflict)
+After=network.target csb-web.service
+
+[Service]
+User=psms
+Group=psms
+ExecStart=/snap/bin/ngrok start csb_dashboard --config /home/psms/ubuntu/program_files/csb/ngrok.yml --log=stdout
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

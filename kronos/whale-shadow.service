@@ -1,0 +1,18 @@
+[Unit]
+Description=Whale/positioning collector (observe-only; logs Binance positioning per CSM candidate, never trades)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=psms
+WorkingDirectory=/home/psms/ubuntu/program_files/csb
+Environment=WHALE_PERIOD=1h
+ExecStart=/home/psms/ubuntu/program_files/csb/kronos/venv/bin/python /home/psms/ubuntu/program_files/csb/kronos/whale_worker.py
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+

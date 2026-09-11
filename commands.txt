@@ -1,0 +1,46 @@
+# ──Restart all the Services ───────────────────────────────────────────────────────────
+
+sudo systemctl daemon-reload
+sudo systemctl restart csb csb-bot csb-discord csb-web csb-ngrok
+
+
+sudo systemctl restart csb-web csb-ngrok
+
+# ── SERVICE CONTROL ───────────────────────────────────────────────────────────
+sudo systemctl start   csb
+sudo systemctl stop csb
+sudo systemctl restart csb
+sudo systemctl status  csb
+
+journalctl -u csb -f
+
+# ── Telegram Bot Control ─────────────────────────────────────────────────────
+
+sudo systemctl start csb-bot
+sudo systemctl stop csb-bot
+sudo systemctl restart csb-bot
+journalctl -u csb-bot -f
+
+
+# ──Discord Bot Control ─────────────────────────────────────────────────────
+
+sudo systemctl start csb-discord
+sudo systemctl stop csb-discord
+sudo systemctl restart csb-discord
+journalctl -u csb-discord -f
+
+# ── LIVE LOG MONITORING ───────────────────────────────────────────────────────
+
+journalctl -u csb -f
+
+
+
+# ──────Activate the Python virtual environment─────────────────────
+
+source venv/bin/activate
+
+#──────Install the new requirements──────
+
+pip install -r requirements.txt
+
+

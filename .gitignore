@@ -1,0 +1,52 @@
+# ── Secrets — NEVER commit ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.secret.txt
+*ai*.txt
+*deepseek*.txt
+Deepseek.txt
+"open ai.txt"
+
+# ── Generated data ───────────────────────────────────────────────────────────
+logs/
+data/symbols/
+data/ml/
+data/loss_cooldown.json
+data/loss_tracker.json
+*.log
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Virtual environment ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+kronos/venv/
+kronos/logs/
+
+# ── Editor junk ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── Market data caches — large, regenerable, never source ────────────────────
+# 161MB in data/ alone plus the backtest tree's own cache. This repo exists as
+# a revert point for CODE; the CSVs are re-fetchable from Binance.
+data/*.csv
+data/freqtrade_bt/
+data/funding/
+data/*.json
+Tire 1-2 Back Test engine/data/
+Tire 1-2 Back Test engine/logs/
+Tire 1-2 Back Test engine/results/
+Tire 1-2 Back Test engine/.venv/
+Tire 1-2 Back Test engine/__pycache__/
+**/prep_cache.pkl
+*.pkl

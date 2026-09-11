@@ -1,0 +1,20 @@
+[Unit]
+Description=Kronos shadow scorer (observe-only; scores CSM candidates, never trades)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=psms
+WorkingDirectory=/home/psms/ubuntu/program_files/csb
+Environment=KRONOS_THREADS=2
+Environment=KRONOS_PF_THR=0.020
+ExecStart=/home/psms/ubuntu/program_files/csb/kronos/venv/bin/python /home/psms/ubuntu/program_files/csb/kronos/shadow_worker.py
+Restart=always
+RestartSec=10
+# Keep it low-priority so it never competes with the trading services.
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,18 @@
+requests==2.32.3
+pandas
+numpy
+python-dotenv==1.0.1
+cryptography==42.0.8
+python-telegram-bot==21.3
+websocket-client==1.8.0
+ta==0.11.0
+schedule==1.2.2
+scikit-learn==1.5.1    # Optional — only needed for ML Phase 4 (200+ trades)
+discord.py==2.3.2      # Discord bot + slash commands
+pandas-ta              # ML Engine features
+fastapi==0.111.0       # Web dashboard
+uvicorn==0.30.1        # ASGI server
+pyngrok==7.1.6         # Ngrok tunnel manager
+aiohttp                # ngrok_runner notifications (was only present transitively via discord.py)
+pyotp                  # dashboard Settings tab 2FA (Google Authenticator)
+qrcode                 # terminal QR for dashboard_2fa_setup.py (optional)

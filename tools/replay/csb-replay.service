@@ -1,0 +1,56 @@
+[Unit]
+# Tier 2 replay — drives production's own live_scanner code over historical
+# 1m data in an isolated tree. NOT a trading service: it never places an order
+# and never writes to the production tree.
+#
+# Deliberately does NOT declare a dependency on csb.service. The replay is
+# read-only with respect to production, so it neither needs the scanner up nor
+# should it be restarted when the scanner is.
+Description=CSB Tier 2 historical replay (isolated, no trading)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=psms
+WorkingDirectory=/home/psms/ubuntu/program_files/test
+
+# Refuse to run against stale code. A replay of a strategy that no longer
+# matches production produces authoritative-looking numbers describing nothing,
+# which is the failure this whole exercise exists to eliminate.
+ExecStartPre=/home/psms/ubuntu/program_files/test/venv/bin/python tools/replay/sync.py --verify
+
+ExecStart=/home/psms/ubuntu/program_files/test/venv/bin/python tools/replay/driver.py \
+    --days 30 \
+    --equity 100 \
+    --out /home/psms/ubuntu/program_files/test/data/replay_30d.json
+
+# ── Resource limits ──────────────────────────────────────────────────────────
+# The box is a 2c/4t i3-6100 with 8 GB running five production services. The
+# live scanner must keep priority: a replay that starves it would delay SL/TP
+# checks on real open positions.
+Nice=15
+CPUWeight=20
+IOWeight=20
+# Measured footprint is 0.82 GB for 100 symbols x 30d. 3G leaves headroom for
+# pandas load spikes while still guaranteeing the scanner cannot be OOM-killed
+# because of this job.
+MemoryMax=3G
+MemoryHigh=2G
+
+# Long job — no watchdog, but do not let a wedged run sit forever.
+TimeoutStartSec=8h
+
+StandardOutput=append:/home/psms/ubuntu/program_files/test/logs/replay.log
+StandardError=append:/home/psms/ubuntu/program_files/test/logs/replay.log
+
+# ── Isolation ────────────────────────────────────────────────────────────────
+# Belt and braces on top of sandbox.py: even a bug that tried to write to the
+# production tree would be denied by the kernel.
+ReadWritePaths=/home/psms/ubuntu/program_files/test
+ReadOnlyPaths=/home/psms/ubuntu/program_files/csb
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

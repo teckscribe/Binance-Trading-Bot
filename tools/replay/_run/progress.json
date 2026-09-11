@@ -1,0 +1,1239 @@
+{
+ "status": "finished",
+ "started_utc": "2026-08-14T15:51:21.181267+00:00",
+ "sim_from": "2026-05-16 23:51:00+00:00",
+ "sim_to": "2026-08-13 17:51:00+00:00",
+ "total_sim_minutes": 127800,
+ "symbols": 100,
+ "starting_equity": 100.0,
+ "updated_utc": "2026-08-14T17:12:41.699024+00:00",
+ "sim_now": "2026-08-13 17:51:00+00:00",
+ "step": 127800,
+ "pct_complete": 100.0,
+ "elapsed": "1h21m",
+ "elapsed_sec": 4881,
+ "eta": "0m",
+ "eta_sec": 0,
+ "trades_closed": 1317,
+ "open_positions": 1,
+ "equity": 111.9254,
+ "net_pnl": 11.9254,
+ "exit_mix": {
+  "SL_HIT": 542,
+  "BE_HIT": 298,
+  "TP_HIT": 275,
+  "TRAIL_HIT": 202
+ },
+ "daily": [
+  {
+   "date": "2026-05-17",
+   "trades": 17,
+   "net_usdt": -2.7974,
+   "cum_net_usdt": -2.7974,
+   "equity": 97.2026,
+   "win_pct": 35.3,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "BE_HIT": 6,
+    "TP_HIT": 2,
+    "TRAIL_HIT": 3
+   }
+  },
+  {
+   "date": "2026-05-18",
+   "trades": 19,
+   "net_usdt": -2.2966,
+   "cum_net_usdt": -5.094,
+   "equity": 94.906,
+   "win_pct": 26.3,
+   "exit_mix": {
+    "BE_HIT": 7,
+    "TRAIL_HIT": 2,
+    "SL_HIT": 7,
+    "TP_HIT": 3
+   }
+  },
+  {
+   "date": "2026-05-19",
+   "trades": 14,
+   "net_usdt": -4.7452,
+   "cum_net_usdt": -9.8392,
+   "equity": 90.1608,
+   "win_pct": 21.4,
+   "exit_mix": {
+    "SL_HIT": 8,
+    "TP_HIT": 2,
+    "BE_HIT": 3,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-05-20",
+   "trades": 9,
+   "net_usdt": -2.772,
+   "cum_net_usdt": -12.6112,
+   "equity": 87.3888,
+   "win_pct": 22.2,
+   "exit_mix": {
+    "SL_HIT": 3,
+    "BE_HIT": 4,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-21",
+   "trades": 3,
+   "net_usdt": -0.0859,
+   "cum_net_usdt": -12.6971,
+   "equity": 87.3029,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "TRAIL_HIT": 1,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-22",
+   "trades": 5,
+   "net_usdt": -0.9459,
+   "cum_net_usdt": -13.643,
+   "equity": 86.357,
+   "win_pct": 40.0,
+   "exit_mix": {
+    "SL_HIT": 3,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-23",
+   "trades": 11,
+   "net_usdt": 6.1937,
+   "cum_net_usdt": -7.4493,
+   "equity": 92.5507,
+   "win_pct": 63.6,
+   "exit_mix": {
+    "TP_HIT": 5,
+    "TRAIL_HIT": 2,
+    "SL_HIT": 3,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-05-24",
+   "trades": 16,
+   "net_usdt": -3.0344,
+   "cum_net_usdt": -10.4837,
+   "equity": 89.5163,
+   "win_pct": 37.5,
+   "exit_mix": {
+    "TP_HIT": 3,
+    "SL_HIT": 8,
+    "TRAIL_HIT": 3,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-25",
+   "trades": 11,
+   "net_usdt": -2.0874,
+   "cum_net_usdt": -12.5711,
+   "equity": 87.4289,
+   "win_pct": 27.3,
+   "exit_mix": {
+    "SL_HIT": 5,
+    "BE_HIT": 3,
+    "TP_HIT": 2,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-05-26",
+   "trades": 10,
+   "net_usdt": 6.2645,
+   "cum_net_usdt": -6.3066,
+   "equity": 93.6934,
+   "win_pct": 70.0,
+   "exit_mix": {
+    "SL_HIT": 3,
+    "TP_HIT": 5,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-27",
+   "trades": 32,
+   "net_usdt": -2.6571,
+   "cum_net_usdt": -8.9637,
+   "equity": 91.0363,
+   "win_pct": 34.4,
+   "exit_mix": {
+    "TP_HIT": 5,
+    "SL_HIT": 12,
+    "TRAIL_HIT": 6,
+    "BE_HIT": 9
+   }
+  },
+  {
+   "date": "2026-05-28",
+   "trades": 22,
+   "net_usdt": -2.13,
+   "cum_net_usdt": -11.0937,
+   "equity": 88.9063,
+   "win_pct": 40.9,
+   "exit_mix": {
+    "SL_HIT": 11,
+    "TRAIL_HIT": 5,
+    "TP_HIT": 4,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-05-29",
+   "trades": 20,
+   "net_usdt": 0.4721,
+   "cum_net_usdt": -10.6216,
+   "equity": 89.3784,
+   "win_pct": 45.0,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "TRAIL_HIT": 3,
+    "TP_HIT": 3,
+    "BE_HIT": 8
+   }
+  },
+  {
+   "date": "2026-05-30",
+   "trades": 12,
+   "net_usdt": 10.6443,
+   "cum_net_usdt": 0.0227,
+   "equity": 100.0227,
+   "win_pct": 58.3,
+   "exit_mix": {
+    "TP_HIT": 6,
+    "SL_HIT": 1,
+    "BE_HIT": 4,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-05-31",
+   "trades": 15,
+   "net_usdt": -6.9359,
+   "cum_net_usdt": -6.9132,
+   "equity": 93.0868,
+   "win_pct": 26.7,
+   "exit_mix": {
+    "TRAIL_HIT": 3,
+    "SL_HIT": 8,
+    "TP_HIT": 1,
+    "BE_HIT": 3
+   }
+  },
+  {
+   "date": "2026-06-01",
+   "trades": 11,
+   "net_usdt": -7.2379,
+   "cum_net_usdt": -14.1511,
+   "equity": 85.8489,
+   "win_pct": 18.2,
+   "exit_mix": {
+    "TRAIL_HIT": 2,
+    "SL_HIT": 7,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-02",
+   "trades": 26,
+   "net_usdt": 6.7006,
+   "cum_net_usdt": -7.4505,
+   "equity": 92.5495,
+   "win_pct": 53.8,
+   "exit_mix": {
+    "TP_HIT": 8,
+    "BE_HIT": 3,
+    "SL_HIT": 11,
+    "TRAIL_HIT": 4
+   }
+  },
+  {
+   "date": "2026-06-03",
+   "trades": 16,
+   "net_usdt": -1.2296,
+   "cum_net_usdt": -8.6801,
+   "equity": 91.3199,
+   "win_pct": 25.0,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "TP_HIT": 2,
+    "BE_HIT": 5,
+    "TRAIL_HIT": 3
+   }
+  },
+  {
+   "date": "2026-06-04",
+   "trades": 7,
+   "net_usdt": -5.303,
+   "cum_net_usdt": -13.9831,
+   "equity": 86.0169,
+   "win_pct": 14.3,
+   "exit_mix": {
+    "SL_HIT": 5,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-05",
+   "trades": 10,
+   "net_usdt": -4.3681,
+   "cum_net_usdt": -18.3512,
+   "equity": 81.6488,
+   "win_pct": 20.0,
+   "exit_mix": {
+    "SL_HIT": 7,
+    "TP_HIT": 1,
+    "TRAIL_HIT": 1,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-06",
+   "trades": 3,
+   "net_usdt": -1.6128,
+   "cum_net_usdt": -19.964,
+   "equity": 80.036,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "SL_HIT": 2,
+    "TP_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-07",
+   "trades": 2,
+   "net_usdt": -0.6084,
+   "cum_net_usdt": -20.5724,
+   "equity": 79.4276,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "SL_HIT": 1,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-08",
+   "trades": 10,
+   "net_usdt": -0.1333,
+   "cum_net_usdt": -20.7057,
+   "equity": 79.2943,
+   "win_pct": 30.0,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "SL_HIT": 4,
+    "TP_HIT": 2,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-09",
+   "trades": 14,
+   "net_usdt": -6.073,
+   "cum_net_usdt": -26.7787,
+   "equity": 73.2213,
+   "win_pct": 21.4,
+   "exit_mix": {
+    "BE_HIT": 2,
+    "SL_HIT": 9,
+    "TRAIL_HIT": 2,
+    "TP_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-10",
+   "trades": 6,
+   "net_usdt": -3.6258,
+   "cum_net_usdt": -30.4045,
+   "equity": 69.5955,
+   "win_pct": 16.7,
+   "exit_mix": {
+    "BE_HIT": 2,
+    "SL_HIT": 4
+   }
+  },
+  {
+   "date": "2026-06-11",
+   "trades": 3,
+   "net_usdt": 0.7112,
+   "cum_net_usdt": -29.6933,
+   "equity": 70.3067,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "SL_HIT": 1,
+    "TP_HIT": 1,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-12",
+   "trades": 3,
+   "net_usdt": -0.3439,
+   "cum_net_usdt": -30.0372,
+   "equity": 69.9628,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "SL_HIT": 1,
+    "BE_HIT": 1,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-13",
+   "trades": 3,
+   "net_usdt": -2.2609,
+   "cum_net_usdt": -32.2981,
+   "equity": 67.7019,
+   "win_pct": 0.0,
+   "exit_mix": {
+    "SL_HIT": 2,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-14",
+   "trades": 3,
+   "net_usdt": 1.4981,
+   "cum_net_usdt": -30.8,
+   "equity": 69.2,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "BE_HIT": 2,
+    "TP_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-15",
+   "trades": 8,
+   "net_usdt": -2.2998,
+   "cum_net_usdt": -33.0998,
+   "equity": 66.9002,
+   "win_pct": 37.5,
+   "exit_mix": {
+    "TRAIL_HIT": 3,
+    "SL_HIT": 4,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-16",
+   "trades": 7,
+   "net_usdt": -1.3902,
+   "cum_net_usdt": -34.49,
+   "equity": 65.51,
+   "win_pct": 28.6,
+   "exit_mix": {
+    "TRAIL_HIT": 2,
+    "SL_HIT": 3,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-17",
+   "trades": 14,
+   "net_usdt": 0.1524,
+   "cum_net_usdt": -34.3376,
+   "equity": 65.6624,
+   "win_pct": 35.7,
+   "exit_mix": {
+    "TP_HIT": 4,
+    "BE_HIT": 2,
+    "SL_HIT": 7,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-18",
+   "trades": 14,
+   "net_usdt": 3.7098,
+   "cum_net_usdt": -30.6278,
+   "equity": 69.3722,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "TP_HIT": 6,
+    "SL_HIT": 6,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-19",
+   "trades": 22,
+   "net_usdt": -3.795,
+   "cum_net_usdt": -34.4228,
+   "equity": 65.5772,
+   "win_pct": 36.4,
+   "exit_mix": {
+    "BE_HIT": 4,
+    "SL_HIT": 11,
+    "TRAIL_HIT": 4,
+    "TP_HIT": 3
+   }
+  },
+  {
+   "date": "2026-06-20",
+   "trades": 14,
+   "net_usdt": 0.0132,
+   "cum_net_usdt": -34.4096,
+   "equity": 65.5904,
+   "win_pct": 42.9,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "SL_HIT": 5,
+    "TRAIL_HIT": 4,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-21",
+   "trades": 9,
+   "net_usdt": 6.1339,
+   "cum_net_usdt": -28.2757,
+   "equity": 71.7243,
+   "win_pct": 77.8,
+   "exit_mix": {
+    "TP_HIT": 5,
+    "BE_HIT": 2,
+    "TRAIL_HIT": 1,
+    "SL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-22",
+   "trades": 15,
+   "net_usdt": -3.951,
+   "cum_net_usdt": -32.2267,
+   "equity": 67.7733,
+   "win_pct": 26.7,
+   "exit_mix": {
+    "SL_HIT": 10,
+    "TP_HIT": 3,
+    "TRAIL_HIT": 1,
+    "BE_HIT": 1
+   }
+  },
+  {
+   "date": "2026-06-23",
+   "trades": 12,
+   "net_usdt": -3.4489,
+   "cum_net_usdt": -35.6756,
+   "equity": 64.3244,
+   "win_pct": 16.7,
+   "exit_mix": {
+    "TP_HIT": 1,
+    "BE_HIT": 3,
+    "TRAIL_HIT": 2,
+    "SL_HIT": 6
+   }
+  },
+  {
+   "date": "2026-06-24",
+   "trades": 3,
+   "net_usdt": -0.4035,
+   "cum_net_usdt": -36.0791,
+   "equity": 63.9209,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "SL_HIT": 1,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-25",
+   "trades": 10,
+   "net_usdt": -0.3796,
+   "cum_net_usdt": -36.4587,
+   "equity": 63.5413,
+   "win_pct": 40.0,
+   "exit_mix": {
+    "BE_HIT": 4,
+    "TP_HIT": 1,
+    "TRAIL_HIT": 3,
+    "SL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-26",
+   "trades": 13,
+   "net_usdt": 4.3985,
+   "cum_net_usdt": -32.0602,
+   "equity": 67.9398,
+   "win_pct": 46.2,
+   "exit_mix": {
+    "TP_HIT": 4,
+    "BE_HIT": 5,
+    "SL_HIT": 2,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-27",
+   "trades": 23,
+   "net_usdt": 0.1809,
+   "cum_net_usdt": -31.8793,
+   "equity": 68.1207,
+   "win_pct": 47.8,
+   "exit_mix": {
+    "TRAIL_HIT": 5,
+    "BE_HIT": 3,
+    "TP_HIT": 5,
+    "SL_HIT": 10
+   }
+  },
+  {
+   "date": "2026-06-28",
+   "trades": 20,
+   "net_usdt": 3.8282,
+   "cum_net_usdt": -28.0511,
+   "equity": 71.9489,
+   "win_pct": 35.0,
+   "exit_mix": {
+    "SL_HIT": 4,
+    "BE_HIT": 9,
+    "TP_HIT": 5,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-06-29",
+   "trades": 16,
+   "net_usdt": 4.5177,
+   "cum_net_usdt": -23.5334,
+   "equity": 76.4666,
+   "win_pct": 56.2,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "TRAIL_HIT": 2,
+    "TP_HIT": 6,
+    "SL_HIT": 5
+   }
+  },
+  {
+   "date": "2026-06-30",
+   "trades": 16,
+   "net_usdt": -2.3595,
+   "cum_net_usdt": -25.8929,
+   "equity": 74.1071,
+   "win_pct": 25.0,
+   "exit_mix": {
+    "TP_HIT": 3,
+    "SL_HIT": 7,
+    "BE_HIT": 4,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-01",
+   "trades": 15,
+   "net_usdt": 3.4001,
+   "cum_net_usdt": -22.4928,
+   "equity": 77.5072,
+   "win_pct": 40.0,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "TRAIL_HIT": 1,
+    "TP_HIT": 5,
+    "BE_HIT": 3
+   }
+  },
+  {
+   "date": "2026-07-02",
+   "trades": 10,
+   "net_usdt": -6.4276,
+   "cum_net_usdt": -28.9204,
+   "equity": 71.0796,
+   "win_pct": 10.0,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "BE_HIT": 3,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-03",
+   "trades": 12,
+   "net_usdt": 1.4003,
+   "cum_net_usdt": -27.5201,
+   "equity": 72.4799,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "SL_HIT": 4,
+    "TRAIL_HIT": 3,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-04",
+   "trades": 12,
+   "net_usdt": -0.8952,
+   "cum_net_usdt": -28.4153,
+   "equity": 71.5847,
+   "win_pct": 25.0,
+   "exit_mix": {
+    "SL_HIT": 4,
+    "BE_HIT": 4,
+    "TRAIL_HIT": 2,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-05",
+   "trades": 12,
+   "net_usdt": -4.4911,
+   "cum_net_usdt": -32.9064,
+   "equity": 67.0936,
+   "win_pct": 25.0,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "SL_HIT": 7,
+    "TRAIL_HIT": 1,
+    "TP_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-06",
+   "trades": 22,
+   "net_usdt": -1.1744,
+   "cum_net_usdt": -34.0808,
+   "equity": 65.9192,
+   "win_pct": 40.9,
+   "exit_mix": {
+    "BE_HIT": 5,
+    "SL_HIT": 9,
+    "TRAIL_HIT": 4,
+    "TP_HIT": 4
+   }
+  },
+  {
+   "date": "2026-07-07",
+   "trades": 16,
+   "net_usdt": -4.075,
+   "cum_net_usdt": -38.1558,
+   "equity": 61.8442,
+   "win_pct": 31.2,
+   "exit_mix": {
+    "BE_HIT": 5,
+    "TP_HIT": 1,
+    "TRAIL_HIT": 3,
+    "SL_HIT": 7
+   }
+  },
+  {
+   "date": "2026-07-08",
+   "trades": 22,
+   "net_usdt": -4.7291,
+   "cum_net_usdt": -42.8849,
+   "equity": 57.1151,
+   "win_pct": 36.4,
+   "exit_mix": {
+    "TP_HIT": 4,
+    "SL_HIT": 12,
+    "BE_HIT": 2,
+    "TRAIL_HIT": 4
+   }
+  },
+  {
+   "date": "2026-07-09",
+   "trades": 14,
+   "net_usdt": 6.3911,
+   "cum_net_usdt": -36.4938,
+   "equity": 63.5062,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "TP_HIT": 6,
+    "BE_HIT": 3,
+    "SL_HIT": 4,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-10",
+   "trades": 8,
+   "net_usdt": 3.6851,
+   "cum_net_usdt": -32.8087,
+   "equity": 67.1913,
+   "win_pct": 62.5,
+   "exit_mix": {
+    "TP_HIT": 3,
+    "SL_HIT": 3,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-11",
+   "trades": 25,
+   "net_usdt": -4.8314,
+   "cum_net_usdt": -37.6401,
+   "equity": 62.3599,
+   "win_pct": 32.0,
+   "exit_mix": {
+    "SL_HIT": 13,
+    "TRAIL_HIT": 3,
+    "BE_HIT": 4,
+    "TP_HIT": 5
+   }
+  },
+  {
+   "date": "2026-07-12",
+   "trades": 18,
+   "net_usdt": 4.4017,
+   "cum_net_usdt": -33.2384,
+   "equity": 66.7616,
+   "win_pct": 38.9,
+   "exit_mix": {
+    "BE_HIT": 3,
+    "TRAIL_HIT": 2,
+    "SL_HIT": 7,
+    "TP_HIT": 6
+   }
+  },
+  {
+   "date": "2026-07-13",
+   "trades": 19,
+   "net_usdt": -0.6633,
+   "cum_net_usdt": -33.9017,
+   "equity": 66.0983,
+   "win_pct": 26.3,
+   "exit_mix": {
+    "BE_HIT": 8,
+    "SL_HIT": 7,
+    "TP_HIT": 4
+   }
+  },
+  {
+   "date": "2026-07-14",
+   "trades": 15,
+   "net_usdt": -0.9542,
+   "cum_net_usdt": -34.8559,
+   "equity": 65.1441,
+   "win_pct": 33.3,
+   "exit_mix": {
+    "BE_HIT": 2,
+    "SL_HIT": 8,
+    "TP_HIT": 4,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-15",
+   "trades": 13,
+   "net_usdt": -5.1595,
+   "cum_net_usdt": -40.0154,
+   "equity": 59.9846,
+   "win_pct": 30.8,
+   "exit_mix": {
+    "SL_HIT": 6,
+    "TP_HIT": 2,
+    "TRAIL_HIT": 3,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-16",
+   "trades": 14,
+   "net_usdt": -1.9505,
+   "cum_net_usdt": -41.9659,
+   "equity": 58.0341,
+   "win_pct": 28.6,
+   "exit_mix": {
+    "BE_HIT": 4,
+    "SL_HIT": 6,
+    "TP_HIT": 2,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-17",
+   "trades": 20,
+   "net_usdt": 3.1205,
+   "cum_net_usdt": -38.8454,
+   "equity": 61.1546,
+   "win_pct": 45.0,
+   "exit_mix": {
+    "TP_HIT": 5,
+    "BE_HIT": 4,
+    "TRAIL_HIT": 5,
+    "SL_HIT": 6
+   }
+  },
+  {
+   "date": "2026-07-18",
+   "trades": 15,
+   "net_usdt": 8.6662,
+   "cum_net_usdt": -30.1792,
+   "equity": 69.8208,
+   "win_pct": 60.0,
+   "exit_mix": {
+    "SL_HIT": 4,
+    "TP_HIT": 6,
+    "BE_HIT": 2,
+    "TRAIL_HIT": 3
+   }
+  },
+  {
+   "date": "2026-07-19",
+   "trades": 12,
+   "net_usdt": -2.2542,
+   "cum_net_usdt": -32.4334,
+   "equity": 67.5666,
+   "win_pct": 41.7,
+   "exit_mix": {
+    "BE_HIT": 5,
+    "TRAIL_HIT": 5,
+    "SL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-20",
+   "trades": 17,
+   "net_usdt": -1.9779,
+   "cum_net_usdt": -34.4113,
+   "equity": 65.5887,
+   "win_pct": 35.3,
+   "exit_mix": {
+    "BE_HIT": 5,
+    "SL_HIT": 6,
+    "TRAIL_HIT": 4,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-21",
+   "trades": 12,
+   "net_usdt": 0.0373,
+   "cum_net_usdt": -34.374,
+   "equity": 65.626,
+   "win_pct": 41.7,
+   "exit_mix": {
+    "TP_HIT": 2,
+    "TRAIL_HIT": 3,
+    "SL_HIT": 4,
+    "BE_HIT": 3
+   }
+  },
+  {
+   "date": "2026-07-22",
+   "trades": 13,
+   "net_usdt": -5.7454,
+   "cum_net_usdt": -40.1194,
+   "equity": 59.8806,
+   "win_pct": 30.8,
+   "exit_mix": {
+    "TRAIL_HIT": 4,
+    "BE_HIT": 4,
+    "SL_HIT": 5
+   }
+  },
+  {
+   "date": "2026-07-23",
+   "trades": 8,
+   "net_usdt": -3.6191,
+   "cum_net_usdt": -43.7385,
+   "equity": 56.2615,
+   "win_pct": 25.0,
+   "exit_mix": {
+    "SL_HIT": 5,
+    "TP_HIT": 1,
+    "BE_HIT": 1,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-24",
+   "trades": 19,
+   "net_usdt": 8.6296,
+   "cum_net_usdt": -35.1089,
+   "equity": 64.8911,
+   "win_pct": 52.6,
+   "exit_mix": {
+    "TP_HIT": 8,
+    "SL_HIT": 6,
+    "TRAIL_HIT": 3,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-25",
+   "trades": 23,
+   "net_usdt": -2.4776,
+   "cum_net_usdt": -37.5865,
+   "equity": 62.4135,
+   "win_pct": 30.4,
+   "exit_mix": {
+    "TRAIL_HIT": 2,
+    "SL_HIT": 10,
+    "BE_HIT": 7,
+    "TP_HIT": 4
+   }
+  },
+  {
+   "date": "2026-07-26",
+   "trades": 17,
+   "net_usdt": 4.4297,
+   "cum_net_usdt": -33.1568,
+   "equity": 66.8432,
+   "win_pct": 47.1,
+   "exit_mix": {
+    "TP_HIT": 4,
+    "BE_HIT": 7,
+    "SL_HIT": 4,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-07-27",
+   "trades": 6,
+   "net_usdt": -7.2158,
+   "cum_net_usdt": -40.3726,
+   "equity": 59.6274,
+   "win_pct": 0.0,
+   "exit_mix": {
+    "SL_HIT": 6
+   }
+  },
+  {
+   "date": "2026-07-28",
+   "trades": 17,
+   "net_usdt": 2.9544,
+   "cum_net_usdt": -37.4182,
+   "equity": 62.5818,
+   "win_pct": 47.1,
+   "exit_mix": {
+    "TP_HIT": 4,
+    "TRAIL_HIT": 4,
+    "SL_HIT": 6,
+    "BE_HIT": 3
+   }
+  },
+  {
+   "date": "2026-07-29",
+   "trades": 14,
+   "net_usdt": 4.3528,
+   "cum_net_usdt": -33.0654,
+   "equity": 66.9346,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "SL_HIT": 5,
+    "BE_HIT": 3,
+    "TP_HIT": 5,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-30",
+   "trades": 19,
+   "net_usdt": 2.7898,
+   "cum_net_usdt": -30.2756,
+   "equity": 69.7244,
+   "win_pct": 31.6,
+   "exit_mix": {
+    "SL_HIT": 8,
+    "TP_HIT": 5,
+    "BE_HIT": 5,
+    "TRAIL_HIT": 1
+   }
+  },
+  {
+   "date": "2026-07-31",
+   "trades": 25,
+   "net_usdt": 7.1742,
+   "cum_net_usdt": -23.1014,
+   "equity": 76.8986,
+   "win_pct": 44.0,
+   "exit_mix": {
+    "BE_HIT": 5,
+    "TP_HIT": 9,
+    "TRAIL_HIT": 2,
+    "SL_HIT": 9
+   }
+  },
+  {
+   "date": "2026-08-01",
+   "trades": 15,
+   "net_usdt": 6.3165,
+   "cum_net_usdt": -16.7849,
+   "equity": 83.2151,
+   "win_pct": 40.0,
+   "exit_mix": {
+    "SL_HIT": 5,
+    "TRAIL_HIT": 1,
+    "BE_HIT": 4,
+    "TP_HIT": 5
+   }
+  },
+  {
+   "date": "2026-08-02",
+   "trades": 26,
+   "net_usdt": -3.1194,
+   "cum_net_usdt": -19.9043,
+   "equity": 80.0957,
+   "win_pct": 38.5,
+   "exit_mix": {
+    "SL_HIT": 11,
+    "TRAIL_HIT": 2,
+    "BE_HIT": 8,
+    "TP_HIT": 5
+   }
+  },
+  {
+   "date": "2026-08-03",
+   "trades": 25,
+   "net_usdt": 2.5932,
+   "cum_net_usdt": -17.3111,
+   "equity": 82.6889,
+   "win_pct": 40.0,
+   "exit_mix": {
+    "TRAIL_HIT": 7,
+    "SL_HIT": 9,
+    "BE_HIT": 5,
+    "TP_HIT": 4
+   }
+  },
+  {
+   "date": "2026-08-04",
+   "trades": 14,
+   "net_usdt": -1.4143,
+   "cum_net_usdt": -18.7254,
+   "equity": 81.2746,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "BE_HIT": 4,
+    "SL_HIT": 5,
+    "TRAIL_HIT": 3,
+    "TP_HIT": 2
+   }
+  },
+  {
+   "date": "2026-08-05",
+   "trades": 25,
+   "net_usdt": -3.8696,
+   "cum_net_usdt": -22.595,
+   "equity": 77.405,
+   "win_pct": 32.0,
+   "exit_mix": {
+    "SL_HIT": 12,
+    "TP_HIT": 5,
+    "BE_HIT": 5,
+    "TRAIL_HIT": 3
+   }
+  },
+  {
+   "date": "2026-08-06",
+   "trades": 31,
+   "net_usdt": 0.5505,
+   "cum_net_usdt": -22.0445,
+   "equity": 77.9555,
+   "win_pct": 41.9,
+   "exit_mix": {
+    "BE_HIT": 8,
+    "TP_HIT": 7,
+    "TRAIL_HIT": 3,
+    "SL_HIT": 13
+   }
+  },
+  {
+   "date": "2026-08-07",
+   "trades": 26,
+   "net_usdt": -3.7055,
+   "cum_net_usdt": -25.75,
+   "equity": 74.25,
+   "win_pct": 34.6,
+   "exit_mix": {
+    "TRAIL_HIT": 3,
+    "TP_HIT": 6,
+    "SL_HIT": 15,
+    "BE_HIT": 2
+   }
+  },
+  {
+   "date": "2026-08-08",
+   "trades": 22,
+   "net_usdt": 1.1507,
+   "cum_net_usdt": -24.5993,
+   "equity": 75.4007,
+   "win_pct": 31.8,
+   "exit_mix": {
+    "TP_HIT": 6,
+    "BE_HIT": 6,
+    "SL_HIT": 10
+   }
+  },
+  {
+   "date": "2026-08-09",
+   "trades": 17,
+   "net_usdt": -3.7092,
+   "cum_net_usdt": -28.3085,
+   "equity": 71.6915,
+   "win_pct": 29.4,
+   "exit_mix": {
+    "BE_HIT": 4,
+    "TP_HIT": 3,
+    "SL_HIT": 8,
+    "TRAIL_HIT": 2
+   }
+  },
+  {
+   "date": "2026-08-10",
+   "trades": 21,
+   "net_usdt": 9.6155,
+   "cum_net_usdt": -18.693,
+   "equity": 81.307,
+   "win_pct": 57.1,
+   "exit_mix": {
+    "TRAIL_HIT": 6,
+    "TP_HIT": 6,
+    "SL_HIT": 6,
+    "BE_HIT": 3
+   }
+  },
+  {
+   "date": "2026-08-11",
+   "trades": 24,
+   "net_usdt": 3.3454,
+   "cum_net_usdt": -15.3476,
+   "equity": 84.6524,
+   "win_pct": 50.0,
+   "exit_mix": {
+    "TRAIL_HIT": 7,
+    "SL_HIT": 7,
+    "TP_HIT": 5,
+    "BE_HIT": 5
+   }
+  },
+  {
+   "date": "2026-08-12",
+   "trades": 30,
+   "net_usdt": 0.5531,
+   "cum_net_usdt": -14.7945,
+   "equity": 85.2055,
+   "win_pct": 36.7,
+   "exit_mix": {
+    "BE_HIT": 6,
+    "TP_HIT": 7,
+    "SL_HIT": 12,
+    "TRAIL_HIT": 5
+   }
+  },
+  {
+   "date": "2026-08-13",
+   "trades": 8,
+   "net_usdt": -7.326,
+   "cum_net_usdt": -22.1205,
+   "equity": 77.8795,
+   "win_pct": 12.5,
+   "exit_mix": {
+    "TRAIL_HIT": 1,
+    "BE_HIT": 1,
+    "SL_HIT": 6
+   }
+  }
+ ]
+}
