@@ -706,6 +706,68 @@ def _get_manual_close_price(symbol: str, direction: str) -> float | None:
     return None
 
 
+def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None]:
+    """
+    Work out WHY a tracked position is no longer on Binance, from the order
+    history since entry. Returns (exit_reason, exit_source, fill_price).
+
+    A position vanishing from positionRisk has three common causes, and only
+    one of them is a human:
+      STOP_MARKET filled  -> the bot's own server-side stop fired between two
+                             fast cycles. This is an SL hit, not a manual close.
+      LIQUIDATION         -> exchange force-close.
+      MARKET / LIMIT      -> someone closed it from the Binance app.
+    Before this, all three were stamped MANUAL_CLOSE, so every exchange-side
+    stop fill showed up in the ledger as if the operator had intervened.
+    """
+    symbol    = pos["symbol"]
+    direction = pos["direction"]
+    close_side = "SELL" if direction == "LONG" else "BUY"
+    pos_side   = "LONG" if direction == "LONG" else "SHORT"
+    try:
+        entry_ms = int(datetime.fromisoformat(str(pos["entry_time"])).timestamp() * 1000)
+    except Exception:
+        import time
+        entry_ms = int((time.time() - 24 * 3600) * 1000)
+
+    try:
+        resp = SESSION.get(
+            BASE_URL + "/fapi/v1/allOrders",
+            params=sign_params({"symbol": symbol, "startTime": entry_ms - 60_000,
+                                "limit": 200}),
+            headers=api_headers(), timeout=8,
+        )
+        orders = resp.json() if resp.status_code == 200 else []
+    except Exception as exc:
+        log.warning(f"allOrders fetch failed [{symbol}]: {exc}")
+        orders = []
+
+    fills = [o for o in orders
+             if o.get("status") == "FILLED"
+             and o.get("side") == close_side
+             and o.get("positionSide") == pos_side]
+    if not fills:
+        price = _get_manual_close_price(symbol, direction)
+        return "MANUAL_CLOSE", "manual", price
+
+    o = max(fills, key=lambda x: int(x.get("updateTime", 0) or 0))
+    try:
+        price = float(o.get("avgPrice") or 0) or None
+    except (TypeError, ValueError):
+        price = None
+    otype = str(o.get("type", "")).upper()
+    is_our_stop = pos.get("stop_order_id") is not None and \
+                  str(o.get("orderId")) == str(pos.get("stop_order_id"))
+
+    if otype in ("STOP_MARKET", "STOP") or is_our_stop:
+        return "SL_HIT", "exchange", price
+    if otype == "LIQUIDATION":
+        return "LIQUIDATED", "exchange", price
+    if otype in ("TAKE_PROFIT_MARKET", "TAKE_PROFIT"):
+        return "TP_HIT", "exchange", price
+    return "MANUAL_CLOSE", "manual", price
+
+
 def _get_live_contracts(symbol: str, direction: str) -> float | None:
     """
     Get the current position size from Binance for a specific symbol/direction.
@@ -977,12 +1039,16 @@ class OrderEngine:
                 code_int = 0
 
             if code_int in _POSITION_GONE_CODES:
+                # Leave it in `active`: reconcile_with_exchange() will find it
+                # missing on Binance, classify the close from order history
+                # (usually the exchange stop fired first) and book the P&L.
+                # Removing it here skipped that entirely — the trade vanished
+                # with no exit log, no notification and no P&L.
                 log.info(
                     f"[LIVE] {symbol}: position no longer exists (code {code_int}) "
-                    f"— removing from active (liquidated or manual close)"
+                    f"— exchange closed it first; reconciler will book the exit"
                 )
-                self.active.remove(pos)
-                return None   # Not a failure — silent cleanup
+                return None   # Not a failure
 
             if code_int != 200 and resp_code != 0:
                 log.error(
@@ -1161,17 +1227,17 @@ class OrderEngine:
             pos_side  = "LONG" if direction == "LONG" else "SHORT"
 
             if LIVE_ENABLED and (sym, pos_side) not in binance_positions:
-                # Position not on exchange — was closed manually or liquidated
-                # Cancel any server-side stop order first
+                # Position not on exchange. Find out why BEFORE cancelling the
+                # stop — a filled stop is the usual reason, and it is an SL
+                # hit, not a manual close.
+                exit_reason, exit_source, close_price = _classify_exchange_close(pos)
                 _cancel_stop_order(sym, pos.get("stop_order_id"))
-
-                close_price = _get_manual_close_price(sym, direction)
                 if close_price is None:
                     close_price = pos["entry_price"]   # fallback
 
                 log.warning(
-                    f"[Reconcile] ⚠️ MANUAL CLOSE detected: {sym} {direction} | "
-                    f"close price ~{close_price:.4f}"
+                    f"[Reconcile] {exit_reason} on exchange: {sym} {direction} | "
+                    f"close price ~{close_price:.4f} (source={exit_source})"
                 )
 
                 entry       = pos["entry_price"]
@@ -1189,8 +1255,8 @@ class OrderEngine:
                 pos.update({
                     "exit_time":      datetime.now(timezone.utc).isoformat(),
                     "exit_price":     close_price,
-                    "exit_reason":    "MANUAL_CLOSE",
-                    "exit_source":    "manual",
+                    "exit_reason":    exit_reason,
+                    "exit_source":    exit_source,
                     "pnl_pct":        round(pnl_pct, 6),
                     "pnl_usdt":       round(pnl_usdt, 4),
                     "pnl_usdt_net":   round(pnl_net, 4),
