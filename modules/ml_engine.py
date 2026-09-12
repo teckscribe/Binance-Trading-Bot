@@ -31,7 +31,7 @@ Phases:
     P(win).  Low-confidence signals are blocked (or logged in shadow mode).
     Shadow mode (ML_SHADOW=true) is the default for safe rollout.
 
-Config (via .env):
+Config (data/settings.json, hot-reloaded):
   ML_PHASE  = 1|2|3|4  (default: 1)
   ML_SHADOW = true|false (default: true - Phase 4 logs but doesn't block)
 """

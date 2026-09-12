@@ -149,7 +149,8 @@ def main():
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--symbols", default=None,
                     help="comma-separated; default = focused watchlist")
-    ap.add_argument("--size", type=int, default=int(os.getenv("FOCUSED_SIZE", "100")),
+    from modules import settings_manager as _cfg
+    ap.add_argument("--size", type=int, default=_cfg.get("FOCUSED_SIZE"),
                     help="watchlist size when --symbols is not given")
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()

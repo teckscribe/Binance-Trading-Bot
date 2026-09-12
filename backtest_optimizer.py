@@ -1035,7 +1035,8 @@ def simulate_portfolio(trades, capital=INITIAL_CAPITAL, leverage=LEVERAGE,
     #                handed out, not taken in arrival order
     #                (live_scanner._scan_for_signals sorts descending)
     COOLDOWN = pd.Timedelta(minutes=int(os.getenv("LOSS_COOLDOWN_MINUTES", "15")))
-    PER_CYCLE = int(os.getenv("MAX_ENTRIES_PER_CYCLE", "3"))
+    from modules import settings_manager as _cfg
+    PER_CYCLE = _cfg.get("MAX_ENTRIES_PER_CYCLE")
 
     # Group by entry timestamp = one scan cycle, then rank within it. Ties on
     # strength keep arrival order, which is what live does (Python sort is
@@ -1439,7 +1440,8 @@ def main():
         symbols = [s.strip().upper() for s in args.symbols.split(",")]
     else:
         from modules.watchlist import get_focused_watchlist
-        symbols = get_focused_watchlist(int(os.getenv("FOCUSED_SIZE", "20")))
+        from modules import settings_manager as _cfg
+        symbols = get_focused_watchlist(_cfg.get("FOCUSED_SIZE"))
 
     # Default to the production set, not every strategy that has a class.
     strategies = [s.strip().upper() for s in args.strategies.split(",")] \

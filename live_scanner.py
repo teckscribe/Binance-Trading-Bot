@@ -160,7 +160,7 @@ from modules.ml_engine         import (
     check_milestone_alert, get_ml_status,
 )
 # LLM regime classification and the LLM advisor were REMOVED 2026-08-11.
-# Both were already disabled via .env and contributed nothing measurable; they
+# Both were already disabled via config and contributed nothing measurable; they
 # were removed so the live engine matches the backtest exactly, making
 # live-vs-backtest divergence attributable to the engine rather than to an
 # optional subsystem. See docs/LLM_REMOVED.md to restore either.
@@ -1420,7 +1420,7 @@ def main() -> None:
     # ── Establish starting equity ─────────────────────────────────────────────
     # LIVE : Binance is the source of truth and already reflects realized P&L.
     # PAPER: no exchange to ask, so apply the persisted simulated P&L on top of
-    #        the .env figure. Without this, paper equity never moved and a
+    #        configured figure. Without this, paper equity never moved and a
     #        multi-day run showed no cumulative performance.
     if LIVE_ENABLED:
         live_bal = get_account_equity()
@@ -1431,7 +1431,7 @@ def main() -> None:
             log.info(f"Account equity from Binance: ${ACCOUNT_EQUITY:.4f} USDT")
         else:
             log.warning(
-                f"Could not fetch live balance — keeping .env value "
+                f"Could not fetch live balance — keeping configured value "
                 f"${ACCOUNT_EQUITY:.2f} USDT"
             )
     else:

@@ -12,12 +12,12 @@ impossible to read cumulative performance off a paper run.
 This module keeps a small JSON file holding the realized P&L accumulated
 across paper trades. Paper equity is therefore:
 
-    equity = starting_equity (.env)  +  realized_pnl_usdt
+    equity = starting_equity (ACCOUNT_EQUITY_USDT setting)  +  realized_pnl_usdt
 
 It persists across restarts, so a multi-day paper run accumulates rather than
-resetting to the .env figure every time the service bounces.
+resetting to the configured figure every time the service bounces.
 
-If ACCOUNT_EQUITY_USDT is changed in .env, the tracker resets to the new
+If ACCOUNT_EQUITY_USDT is changed (settings.json), the tracker resets to the new
 starting figure — a different starting balance means a different experiment.
 """
 

@@ -10,7 +10,7 @@ A modular multi-strategy algorithmic trading engine for **USDT-margined perpetua
 
 It runs headlessly on an Ubuntu VPS as dedicated systemd services, with real-time interactive control via Telegram and Discord bots, a FastAPI web dashboard with 2FA, and an isolated background Kronos neural forecasting observer.
 
-**Current Operating Mode:** Fully configurable via .env (LIVE_ENABLED=true for live real-money execution on Binance; LIVE_ENABLED=false for internal simulated execution).
+**Current Operating Mode:** LIVE_ENABLED in .env selects real-money execution on Binance (true) or internal simulated execution (false). Every other tunable lives in `data/settings.json` (`modules/settings_manager.py`), hot-reloaded by the scanner each cycle, so edits from the dashboard, Telegram or Discord apply without a restart.
 
 ---
 
@@ -128,7 +128,7 @@ The system is deployed on an Ubuntu 24.04 VPS as modular systemd units:
 12. **HWM Entry Candle Guard**: Clamped price extremes on the entry bar to prevent phantom stop-outs from pre-fill wick leakage.
 13. **Kronos Inference Mode (`.eval()`)**: Added explicit `.eval()` mode calls on Kronos model and tokenizer to turn off stochastic dropout during inference.
 14. **Kronos Dependencies & Pipeline**: Added `safetensors>=0.4.0` and wired `log_candidate()` into `live_scanner.py` candidate loop.
-15. **Mid-Trade Restart Survival**: Configured `CLOSE_ON_SHUTDOWN=false` in `.env` with validated state persistence and rehydration.
+15. **Mid-Trade Restart Survival**: Configured `CLOSE_ON_SHUTDOWN=false` (settings.json) with validated state persistence and rehydration.
 16. **Repository Hardening**: Added `.gitattributes` (`*.sh text eol=lf`), cleaned `.gitignore` (targeted `data/*.csv`), removed unused `cryptography`.
 
 ### Post-Release Audit — 2026-09-12 08:30 IST

@@ -19,7 +19,7 @@ Inline buttons:
 
 Capital change flow:
   Tap 💰 Capital → shows current value + asks to type new amount
-  User types e.g. "500" → bot validates → writes to .env → confirms
+  User types e.g. "500" → bot validates → writes data/settings.json → confirms
   Scanner must be restarted for new capital to take effect.
 
 Security: all input rejected from any chat_id other than TELEGRAM_CHAT_ID.
@@ -828,7 +828,7 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     now  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    # Fetch live balance from Binance (fall back to .env)
+    # Fetch live balance from Binance (fall back to the configured equity)
     live_bal = None
     try:
         from modules.binance_status import get_pnl_summary
