@@ -98,7 +98,7 @@ def _setting(key: str) -> str:
 
 
 def _set_setting(key: str, value) -> tuple[bool, str]:
-    ok, err = cfg.set_value(key, value)
+    ok, err = cfg.set_value(key, value, source="telegram")
     if ok:
         log.info(f"settings.json updated: {key}={value}")
     else:

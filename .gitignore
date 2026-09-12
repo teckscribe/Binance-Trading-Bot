@@ -15,6 +15,7 @@ data/ml/
 data/loss_cooldown.json
 data/loss_tracker.json
 data/settings.json
+data/settings_history.jsonl
 *.log
 
 # ── Python ───────────────────────────────────────────────────────────────────

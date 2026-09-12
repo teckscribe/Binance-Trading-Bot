@@ -708,6 +708,30 @@ async function fetchSettings() {
     } catch (err) {
         setStatus("Could not load settings: " + err.message, "text-red");
     }
+    fetchSettingsHistory();
+}
+
+async function fetchSettingsHistory() {
+    const body = document.getElementById('set-history-body');
+    if (!body) return;
+    try {
+        const d = await (await fetch('/api/settings/history?limit=30')).json();
+        const rows = d.changes || [];
+        if (!rows.length) {
+            body.innerHTML = `<tr><td colspan="5" class="set-note-dim">No changes recorded yet.</td></tr>`;
+            return;
+        }
+        body.innerHTML = rows.map(r => `
+            <tr>
+              <td>${setEsc(String(r.ts || "").replace("T", " ").replace("+00:00", ""))}</td>
+              <td>${setEsc(r.source)}</td>
+              <td><code>${setEsc(r.key)}</code></td>
+              <td>${setEsc(r.from)}</td>
+              <td><b>${setEsc(r.to)}</b></td>
+            </tr>`).join("");
+    } catch (err) {
+        body.innerHTML = `<tr><td colspan="5" class="text-red">Could not load history: ${setEsc(err.message)}</td></tr>`;
+    }
 }
 
 async function saveSettings() {

@@ -50,6 +50,7 @@ log = logging.getLogger("Settings")
 
 _PROJECT_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SETTINGS_FILE = os.path.join(_PROJECT_DIR, "data", "settings.json")
+HISTORY_FILE  = os.path.join(_PROJECT_DIR, "data", "settings_history.jsonl")
 ENV_FILE      = os.path.join(_PROJECT_DIR, ".env")
 
 _TRUE  = ("1", "true", "yes", "on")
@@ -486,9 +487,47 @@ def _write_raw(raw: dict) -> bool:
     return ok
 
 
-def update(changes: dict) -> tuple:
+def _append_history(applied: list, source: str) -> None:
+    """One JSONL line per changed key, so "why is leverage 7?" is answerable
+    later. Append-only; a failure here never fails the settings write."""
+    try:
+        os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+        ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            for a in applied:
+                f.write(json.dumps({"ts": ts, "source": source, "key": a["key"],
+                                    "from": a["from"], "to": a["to"]}) + "\n")
+    except Exception as exc:
+        log.warning(f"settings history append failed: {exc}")
+
+
+def history(limit: int = 20) -> list:
+    """Most recent `limit` change records, newest first."""
+    try:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return []
+    out = []
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+        if len(out) >= limit:
+            break
+    return out
+
+
+def update(changes: dict, source: str = "unknown") -> tuple:
     """
     Validate and persist several keys at once.
+
+    `source` names who made the change ("dashboard", "telegram", "discord",
+    ...) and is recorded in data/settings_history.jsonl.
 
     Returns (ok, applied, errors):
       applied : [{"key", "from", "to"}] for keys whose value actually changed
@@ -523,13 +562,14 @@ def update(changes: dict) -> tuple:
         if not _write_raw(raw):
             return False, [], ["could not write settings.json"]
         for a in applied:
-            log.info(f"[SETTINGS] {a['key']}: {a['from']!r} -> {a['to']!r}")
+            log.info(f"[SETTINGS] {a['key']}: {a['from']!r} -> {a['to']!r} ({source})")
+        _append_history(applied, source)
         return True, applied, []
 
 
-def set_value(key: str, value) -> tuple:
+def set_value(key: str, value, source: str = "unknown") -> tuple:
     """Single-key convenience: (ok, error_message)."""
-    ok, _applied, errors = update({key: value})
+    ok, _applied, errors = update({key: value}, source=source)
     return ok, ("; ".join(errors) if errors else "")
 
 
@@ -555,5 +595,7 @@ def migrate_from_env() -> bool:
     if _write_raw(raw):
         log.info(f"Created {SETTINGS_FILE} — {len(seeded)} value(s) seeded from .env: "
                  f"{', '.join(seeded)}")
+        _append_history([{"key": k, "from": "", "to": to_str(k, raw[k])} for k in KEYS],
+                        "migrate_from_env")
         return True
     return False

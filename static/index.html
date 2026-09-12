@@ -253,6 +253,19 @@
                 <p class="set-status" id="set-status"></p>
             </div>
 
+            <div class="card">
+                <div class="card-header">
+                    <h2>&#128203; Recent Changes</h2>
+                </div>
+                <p class="set-note set-note-dim">Who changed what, newest first. Full log: <code>data/settings_history.jsonl</code></p>
+                <div style="overflow-x:auto;">
+                    <table class="data-table set-history">
+                        <thead><tr><th>When (UTC)</th><th>Source</th><th>Setting</th><th>From</th><th>To</th></tr></thead>
+                        <tbody id="set-history-body"><tr><td colspan="5" class="set-note-dim">No changes recorded yet.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
         </div><!-- /tab-settings -->
 
     </div>

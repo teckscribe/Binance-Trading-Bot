@@ -569,6 +569,8 @@ header {
 }
 .set-help { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
 .set-pill { font-size: 10px; padding: 1px 7px; align-self: flex-start; margin: 2px 0; }
+.set-history th, .set-history td { padding: 8px 12px; font-size: 13px; }
+.set-history code { font-size: 12px; }
 
 .set-control { flex: 0 0 200px; display: flex; justify-content: flex-end; }
 .set-control input[type="number"],

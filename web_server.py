@@ -493,6 +493,12 @@ async def get_settings():
     }
 
 
+@app.get("/api/settings/history")
+async def get_settings_history(limit: int = 30):
+    """Recent setting changes (newest first), with who made them."""
+    return {"changes": cfg.history(max(1, min(200, limit)))}
+
+
 @app.post("/api/settings")
 async def save_settings(request: Request):
     try:
@@ -519,7 +525,7 @@ async def save_settings(request: Request):
                                              for k in unknown)},
             status_code=400)
 
-    ok, applied, errors = cfg.update(changes)
+    ok, applied, errors = cfg.update(changes, source="dashboard")
     if errors:
         status = 500 if errors == ["could not write settings.json"] else 400
         return JSONResponse({"ok": False, "error": "; ".join(errors)},
