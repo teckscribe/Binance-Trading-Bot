@@ -82,7 +82,7 @@ Across extensive 90-day leak-free backtests (100 symbols, 0.08% taker fees, 0.03
 | Parameter | Value | Description |
 |---|---|---|
 | **Risk per Trade** | 1.0% of equity | Scaled dynamically by ATR stop distance |
-| **Max Concurrent Positions** | 3 (default) | Configurable via MAX_CONCURRENT |
+| **Max Concurrent Positions** | 3 (default) | `MAX_CONCURRENT` in `data/settings.json` — hot-reloaded |
 | **Max Margin per Trade** | 30% of equity | Limits maximum capital at risk per trade |
 | **Max Leverage** | 50× ceiling | Realized leverage governed by stop width |
 | **Daily Loss Cap** | −10% (configurable) | Blocks new entries until next UTC day |
@@ -92,11 +92,13 @@ Across extensive 90-day leak-free backtests (100 symbols, 0.08% taker fees, 0.03
 | **Excluded Assets** | All tokenized equities, ETFs, precious metals | Filtered in modules/symbol_filter.py (EXCLUDED_BASES) |
 | **Mid-Trade Restart Survival** | `CLOSE_ON_SHUTDOWN=false` | Persists stops & HWM to disk; rehydrates seamlessly |
 
+All parameters marked configurable live in `data/settings.json` (schema: `modules/settings_manager.py` `SPEC`, 46 keys) and are re-read by the scanner every cycle. Edits from the dashboard Settings tab, Telegram or Discord apply within one cycle with no restart. `.env` holds only secrets and `LIVE_ENABLED`.
+
 ---
 
 ## 🖥️ 6. Deployment & Services
 
-The system is deployed on an Ubuntu 24.04 VPS as modular systemd units:
+The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) as modular systemd units:
 
 | Unit | Process | Role |
 |---|---|---|
@@ -138,3 +140,13 @@ The system is deployed on an Ubuntu 24.04 VPS as modular systemd units:
 20. **Relocation-Proof Tools**: All 12 `tools/*.py` scripts + `overnight.sh` use `os.path.dirname(os.path.abspath(__file__))` rather than hardcoded paths. Safe after project folder rename.
 21. **194S TDS confirmed inapplicable**: 1% TDS under Section 194S does NOT apply to USDM futures derivatives (no VDA transfer occurs). Tax question still open on 115BBH vs speculative-business classification — resolve with a CA.
 
+### Runtime Settings Migration (.env → settings.json) — 2026-09-12 12:20 IST
+22. **Hot-reloaded settings store**: New `modules/settings_manager.py` — single `SPEC` (46 keys: type, bounds, default, help, hot flag), typed `get()` cached on `(mtime, size)` and stat-throttled to 1/s, validated atomic `update()` (temp file + `os.replace`). Store is `data/settings.json` (gitignored). Commits `928b8e2`, `1ec0e58`, `6e0ab0e`.
+23. **`.env` reduced to secrets + `LIVE_ENABLED`**: Binance keys, bot tokens/IDs, webhook, ngrok authtoken, TOTP secret and `LIVE_ENABLED` stay in `.env`. Every tunable (equity, intervals, risk caps, leverage, per-strategy caps, loss caps, all `CSM_*` / `NASOS_*`, ML phase/shadow, Telegram toggle, log level) moved to `settings.json`. Only `NGROK_ENABLED` still needs its service restarted.
+24. **Zero-touch migration**: first service start after deploy seeds `settings.json` 1:1 from that machine's `.env` (verified against the production `.env`: 36 values seeded, 10 absent keys take the code's existing defaults). `.env` lines are left in place and ignored. Behaviour before/after is identical.
+25. **Scanner per-cycle refresh**: `live_scanner._refresh_settings()` re-snapshots all hot keys at the top of every loop cycle, logs each change (`[SETTINGS] KEY changed -> value (applied live)`), forces a symbol-universe rebuild when `FOCUSED_MODE` / `FOCUSED_SIZE` / `TOP_N_SYMBOLS` / `MIN_COIN_AGE_DAYS` change, applies `LOG_LEVEL` live, and resets the paper ledger when `ACCOUNT_EQUITY_USDT` changes in PAPER mode.
+26. **Call-time reads everywhere else**: `risk_engine` (`max_concurrent()`, `max_per_strategy()`, `get_leverage()`, loss caps, SL bounds), `ml_engine` (`_phase()`, `_shadow()`), `watchlist` (`MIN_COIN_AGE_DAYS`), CSM and NASOS strategies — no more import-time constants.
+27. **One writer path**: dashboard `POST /api/settings`, Telegram and Discord bots all go through `settings_manager.update()`; the three divergent `.env` writers (two not crash-safe) are removed. Bot messages now say "applies on the next cycle" instead of "restart the scanner". `LIVE_ENABLED` flips still use an atomic `.env` write and restart the scanner.
+28. **Backtest sweeps preserved**: a shell env value that did not come from `.env` still overrides the file (`CSM_MOM_LO=3.5 python backtest_optimizer.py`), and such overrides are never persisted.
+29. **Audit trail**: every applied change appends `{ts, source, key, from, to}` to `data/settings_history.jsonl` (source = dashboard / telegram / discord / migrate_from_env); dashboard Settings tab shows the last 30 via `GET /api/settings/history`.
+30. **Verification**: 42 unit checks (migration, typing, validation, cross-process hot reload ≤1s, corrupt-file recovery, `.env` preservation) + 51 integration checks (scanner refresh, live sizing gates, CSM max-hold, TOTP-authenticated dashboard save, bot helpers) + static wiring audit (every SPEC key read via `settings_manager`, zero `os.getenv` reads of migrated keys, no dangling keys, no legacy writers) — all green. Dashboard verified in browser.

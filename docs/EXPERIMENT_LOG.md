@@ -71,6 +71,53 @@ Following an independent 4-agent parallel code audit, 13 specific vulnerabilitie
 
 ---
 
+### 0.3 Runtime Settings Migration — .env → data/settings.json (2026-09-12 11:20–12:20 IST)
+
+**Problem.** Every tunable was read with `os.getenv()` at module import, so a change made from Telegram, Discord or the dashboard needed a scanner restart — and a restart with `CLOSE_ON_SHUTDOWN=false` still costs a reconcile pass and a gap in management. Three separate `.env` writers had grown up (`telegram_bot`, `discord_bot`, `web_server`); two used plain `open(path, "w")` and could truncate `.env` on a crash mid-write. Only `GLOBAL_LEVERAGE` was hot (risk_engine re-read `.env` on mtime).
+
+**Design.** `modules/settings_manager.py`:
+- `SPEC` — 46 keys, each with type (`int|float|bool|choice|csv_caps`), bounds, default, group, label, help, `hot` flag. The dashboard renders from it; every writer validates against it.
+- `get(key)` — typed; re-reads `data/settings.json` only when `(mtime, size)` changes, and checks that at most once per second, so it is safe per-signal (CSM calls it ~10× per symbol per scan).
+- `update({k: v}, source)` — validates the whole batch first (one bad key → nothing written), rewrites via temp file + `os.replace`, always writes the complete key set (repairs a partial/corrupt file), appends to `data/settings_history.jsonl`.
+- Precedence: shell env value not from `.env` → `settings.json` → `.env` (only for a key absent from the file) → default. The first rule keeps `CSM_MOM_LO=3.5 python backtest_optimizer.py` sweeps working with no code, and such overrides are never persisted.
+- `migrate_from_env()` — on first start creates the file seeded from `.env`; `.env` lines are left in place and ignored thereafter.
+- `env_get/env_set` — the one sanctioned `.env` writer, atomic, used only for `LIVE_ENABLED`.
+
+**Stays in `.env`:** `BINANCE_API_KEY/SECRET`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, `DISCORD_BOT_TOKEN/GUILD_ID/CHANNEL_ID/WEBHOOK_URL`, `NGROK_AUTHTOKEN`, `DASHBOARD_TOTP_SECRET`, `LIVE_ENABLED`, plus infra knobs (`BINANCE_RECV_WINDOW_MS`, `*_CACHE_TTL_SEC`, `CSB_NO_FILE_CACHE`) and the `kronos/` subsystem's own vars.
+
+**Consumers rewired (all read at call time now):**
+
+| File | Change |
+|---|---|
+| `live_scanner.py` | `_refresh_settings()` at top of every cycle re-snapshots 15 module globals, logs each change, forces symbol rebuild on universe-shape keys, applies `LOG_LEVEL` live, resets paper ledger on `ACCOUNT_EQUITY_USDT` change (PAPER only; LIVE takes Binance balance). `_tg()` reads `TELEGRAM_ENABLED` per call. |
+| `modules/risk_engine.py` | Constants → functions: `max_concurrent()`, `max_total_margin_pct()`, `max_leveraged_loss_pct()`, `min_sl_pct()`, `max_sl_pct()`, `max_trade_loss_pct()`, `daily_loss_cap()`, `weekly_loss_cap()`, `session_loss_floor()`, `max_per_strategy()`. `get_leverage()` reads `GLOBAL_LEVERAGE` (0 = per-strategy table). The old `.env`-mtime reader is gone. |
+| `modules/strategies/cross_sectional_momentum.py` | All `CSM_*` read at the top of `scan()` / `_build_signal()` / `manage()`. |
+| `modules/strategies/freqtrade_port_nasos.py` | `NASOS_SL_MODE/SL_ATR/SL_FLAT/TP_ATR`, `PORT_MAX_HOLD_MIN` read per call. |
+| `modules/ml_engine.py` | `_phase()` / `_shadow()`. |
+| `modules/watchlist.py` | `MIN_COIN_AGE_DAYS` read per exchange-info fetch. |
+| `modules/auth_manager.py` | Preflight equity sanity check reads the setting. |
+| `web_server.py` | Private `SETTINGS_SPEC` / `_read_env_values` / `_validate` / `_write_env_values` deleted (−300 lines); `GET/POST /api/settings` and `GET /api/settings/history` use the manager. `restart_required` only for cold keys (`NGROK_ENABLED`). |
+| `telegram_bot.py`, `discord_bot.py` | `_read_env_value` / `_write_env_value` deleted; `_setting()` / `_set_setting()` / `_live_enabled()`. Messages: "applies on the scanner's next cycle — no restart needed". |
+| `ngrok_runner.py` | `NGROK_ENABLED` from settings (read once; cold). |
+| `backtest_optimizer.py`, `tools/llmvalue.py`, `tools/replay/analyze.py`, `tools/fetch_1m.py` | Snapshot the accessor functions once per run. |
+| `static/app.js`, `static/index.html`, `static/style.css` | "restart" pill on cold keys; Recent Changes table. |
+
+**Migration check against the production `.env` (2026-09-12 12:05 IST).** Simulated `migrate_from_env()` on the exact Ubuntu `.env` tunables: 36 keys seeded 1:1 (`MAX_CONCURRENT=3`, `MAX_PER_STRATEGY=CSM:3,NASOS_V4:2,ELLIOT_V8:1`, `FOCUSED_SIZE=150`, `MIN_STRENGTH=0.5`, all `CSM_*`, `ML_PHASE=2`, …). 10 keys absent from `.env` take the defaults the code already used: `MIN_SL_PCT=0.015`, `DAILY_LOSS_CAP=-0.10`, `WEEKLY_LOSS_CAP=-0.15`, `SESSION_LOSS_FLOOR=-0.10`, `NASOS_SL_MODE=flat`, `NASOS_SL_FLAT=0.08`, `NASOS_SL_ATR=6.0`, `NASOS_TP_ATR=3.0`, `PORT_MAX_HOLD_MIN=0`, `MANAGE_ON_BAR_CLOSE=false`. **Behaviour before and after deploy is identical.**
+
+**Verification.**
+- 42 unit checks (scratch dir): migration typing (`.50` → 0.5, out-of-range `.env` value → default), batch rejection writes nothing, csv_caps normalisation, `set_value` errors, cross-process hot reload seen within ~1s, hand-edited bad value → default with one warning, corrupt file → `.env`/defaults and repaired on next write, `env_set` preserves comments/non-ASCII/other lines, no temp files left.
+- 51 integration checks: scanner import seeds file; `_refresh_settings()` returns exactly the changed keys and updates all globals; `get_leverage`, `max_per_strategy`, `is_strategy_cap_hit` live; `_tg` honours `TELEGRAM_ENABLED`; CSM `manage()` honours a live `CSM_MAX_HOLD_MIN`; `compute_position_size` rejects/accepts on a live `MAX_SL_PCT`; dashboard `GET` exposes exactly the spec (no secrets, no `LIVE_ENABLED`), `POST` refuses bad OTP, rejects out-of-range and non-spec keys, applies a TOTP-authenticated save and flags only `NGROK_ENABLED` as restart; bot helpers read settings.
+- Static wiring audit: every SPEC key has ≥1 `settings_manager` consumer and zero `os.getenv` reads; every `.env`-only key is still read from env and is not in SPEC; no `cfg.get()` of an unknown key; no legacy env writers; all 15 scanner snapshots covered by the per-cycle refresh; no local shadowing of refreshed globals in `main()`.
+- Dashboard rendered and checked in browser (Settings tab, restart pill, history table).
+
+**Deploy.** `git pull` + `systemctl restart csb csb-bot csb-discord csb-web csb-ngrok`. Journal will show `Created data/settings.json — 36 value(s) seeded from .env`. Never rsync `data/settings.json` from a dev box over the production one. `.gitignore` excludes `data/settings.json` and `data/settings_history.jsonl`.
+
+**Lesson (process, not code).** Do not run integration tests against the real project `data/` — the first run left test rows (`CSM_MOM_LO 3.0 → 3.3`, `MAX_CONCURRENT 5 → 4`) visible in the dashboard history and looked like a real config change. Tests now point `SETTINGS_FILE` / `HISTORY_FILE` at a scratch directory.
+
+Commits: `928b8e2` (migration), `1ec0e58` (offline tools + stale wording), `6e0ab0e` (audit trail).
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-12. Sections below this point may use earlier parameter values
@@ -2822,7 +2869,7 @@ comparison to avoid confounding it. Worth syncing before the next port backtest.
 
 ---
 
-## 19. PRODUCTION RELEASE — FILES DEPLOYED TO UBUNTU (2026-09-11) — supersedes §18
+## 19. PRODUCTION RELEASE — FILES DEPLOYED TO UBUNTU (2026-09-11) — supersedes §18, superseded by §20
 
 Full production release deployed. All files below were synced to the Ubuntu VPS.
 
@@ -2849,6 +2896,33 @@ Full production release deployed. All files below were synced to the Ubuntu VPS.
 
 **Not deployed (backtest tree only):**
 `Tire 1-2 Back Test engine/` — excluded from git per `.gitignore`. Manual sync before next backtest run.
+
+---
+
+## 20. FILES TO DEPLOY TO UBUNTU (2026-09-12) — supersedes §19
+
+Settings migration (§0.3). Pull the whole tree; the files that matter:
+
+| File | Change | §Ref |
+|---|---|---|
+| `modules/settings_manager.py` | **NEW** — SPEC, typed hot-reload reader, validated atomic writer, migration, history | §0.3 |
+| `live_scanner.py` | `_refresh_settings()` per cycle; config block reads settings; `_tg()` live toggle | §0.3 |
+| `modules/risk_engine.py` | Limits are functions; `get_leverage()` from settings; old `.env` reader removed | §0.3 |
+| `modules/strategies/cross_sectional_momentum.py` | `CSM_*` read per call | §0.3 |
+| `modules/strategies/freqtrade_port_nasos.py` | `NASOS_*`, `PORT_MAX_HOLD_MIN` read per call | §0.3 |
+| `modules/ml_engine.py` | `_phase()` / `_shadow()` | §0.3 |
+| `modules/watchlist.py` | `MIN_COIN_AGE_DAYS` per fetch | §0.3 |
+| `modules/auth_manager.py` | Preflight equity check from settings | §0.3 |
+| `web_server.py` | Settings API from the manager; `/api/settings/history` | §0.3 |
+| `telegram_bot.py`, `discord_bot.py` | Shared helpers; no `.env` writers; new messages | §0.3 |
+| `ngrok_runner.py` | `NGROK_ENABLED` from settings | §0.3 |
+| `static/app.js`, `static/index.html`, `static/style.css` | restart pill; Recent Changes table | §0.3 |
+| `backtest_optimizer.py`, `tools/llmvalue.py`, `tools/replay/analyze.py`, `tools/fetch_1m.py` | Accessor snapshots | §0.3 |
+| `.env.example`, `.gitignore`, `DEPLOY.md`, `PROJECT_BRIEF.md` | Docs; ignore `data/settings.json`, `data/settings_history.jsonl` | §0.3 |
+
+**Generated on first start (do not copy from dev):** `data/settings.json`, `data/settings_history.jsonl`.
+
+**`.env` on the box:** unchanged. Migrated keys may be deleted from it later (cosmetic).
 
 ---
 
