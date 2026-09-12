@@ -1,6 +1,6 @@
 # ⚡ Binance Futures AI Trading Terminal — System Brief (CSB)
 
-*Last updated: 2026-09-11 — Production Release (CSM Hybrid Ladder, Monotone HWM Peak Tracking, Freqtrade Port Integrations, Zero-Handshake Session Pooling, Preloaded Exchange Specs)*
+*Last updated: 2026-09-12 — Production Release + Audit Hardening (CSM Hybrid Ladder, Monotone HWM Peak Tracking, Regime Permission Updates, Relocation-Proof Tools)*
 
 ---
 
@@ -32,9 +32,9 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 ### Stage 3 — Strategy Suite & Factory · modules/strategies/strategy_factory.py
 - Evaluates permitted strategies based on the current regime.
 - **Active Production Strategies**:
-  1. **CSM (Cross-Sectional Momentum)**: Volatility-normalized 24h momentum breakout with **Dual-Stage Hybrid Profit Ladder**, **Monotone High-Water Mark (HWM) peak tracking**, and **Volume Expansion Filter**. Gated to RANGING where backtests prove $+666\% \sim +719\%$ net profit.
-  2. **NASOS_V4**: Freqtrade-ported multi-indicator volatility strategy.
-  3. **ELLIOT_V8**: Freqtrade-ported Elliot Wave impulse breakout strategy.
+  1. **CSM (Cross-Sectional Momentum)**: Volatility-normalized 24h momentum breakout with **Dual-Stage Hybrid Profit Ladder**, **Monotone High-Water Mark (HWM) peak tracking**, and **Volume Expansion Filter**. Proven in RANGING (+666%–+719% net). Also active in BEAR_TREND from 2026-09-12 as a live monitoring experiment (backtest baseline: −0.144%/trade — see §0.2.11 in EXPERIMENT_LOG).
+  2. **NASOS_V4**: Freqtrade-ported multi-indicator volatility strategy. Active in BULL_TREND and BEAR_TREND.
+  3. **ELLIOT_V8**: Freqtrade-ported Elliot Wave impulse breakout strategy. *(Currently benched: regime permissions set to False in all regimes 2026-09-12. Reinstated when ≥100 live trades confirm the backtest baseline — see §0.2.11 in EXPERIMENT_LOG.)*
 
 ### Stage 4 — Risk Engine & Telemetry · modules/risk_engine.py + modules/ml_engine.py
 - Dynamic position sizing based on account equity, ATR stop distance, and leverage cap.
@@ -58,7 +58,7 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 |---|---|---|---|
 | **CSM** | Cross-Sectional Momentum | 24h move in 3.0–4.0 ATR(1h) band + **Completed-Candle Volume Expansion Filter** (`vol_ratio >= 1.0x` 24h avg). | **Dual-Stage Hybrid Ladder**: Stage 1 (+1.0% → +0.15% lock) on 15m bar close; Stages 2 & 3 (+2.5% → +1.50%, +4.0% → +2.50%) on Peak HWM; ATR trailing stop; HWM entry-candle guard. |
 | **NASOS_V4** | Freqtrade NASOS Port | Multi-timeframe trend & momentum confirmation with ATR breakout. | Dynamic SL + ATR trailing profit targets. |
-| **ELLIOT_V8** | Freqtrade Elliot Wave Port | Wave impulse expansion and wave-3 continuation detection. | Dynamic SL + Wave exhaustion exit. |
+| **ELLIOT_V8** | Freqtrade Elliot Wave Port *(benched 2026-09-12)* | Wave impulse expansion and wave-3 continuation detection. | Dynamic SL + Wave exhaustion exit. *(Regime permissions False in all regimes. Regime gates re-opened when ≥100 live trades available for validation — §0.2.11 EXPERIMENT_LOG.)* |
 
 *Retired/Archived: WKD, OIB, LIQ, VRP, FF_V2, TP, LLM_ADVISOR.*
 
@@ -73,7 +73,7 @@ Across extensive 90-day leak-free backtests (100 symbols, 0.08% taker fees, 0.03
 - **Bar-Close vs HWM Hybrid**:
   - Evaluating Stage 1 (+1.0%) on completed 15m bar close eliminates 1-second noise premature breakeven exits.
   - Evaluating Stages 2 (+2.5%) & 3 (+4.0%) on Peak HWM instantly captures rapid intra-bar wick expansions.
-- **Regime Gating**: In confirmed BULL_TREND squeezes, CSM was found to lose -130.5% (short wicks squeezed, late longs top-ticked). Locking CSM exclusively to RANGING converts it into an engine with massive alpha.
+- **Regime Gating**: In confirmed BULL_TREND squeezes, CSM was found to lose −130.5% (short wicks squeezed, late longs top-ticked). In RANGING, CSM delivers the +666%–+719% result. In BEAR_TREND, the 90-day backtest measured −0.144%/trade (−111.9% cumulative, 778 trades). CSM is gated **RANGING + BEAR_TREND** from 2026-09-12; BEAR_TREND is a live monitoring experiment with the measured backtest baseline above as the decision threshold (EXPERIMENT_LOG §0.2.11).
 
 ---
 
@@ -130,4 +130,11 @@ The system is deployed on an Ubuntu 24.04 VPS as modular systemd units:
 14. **Kronos Dependencies & Pipeline**: Added `safetensors>=0.4.0` and wired `log_candidate()` into `live_scanner.py` candidate loop.
 15. **Mid-Trade Restart Survival**: Configured `CLOSE_ON_SHUTDOWN=false` in `.env` with validated state persistence and rehydration.
 16. **Repository Hardening**: Added `.gitattributes` (`*.sh text eol=lf`), cleaned `.gitignore` (targeted `data/*.csv`), removed unused `cryptography`.
+
+### Post-Release Audit — 2026-09-12 08:30 IST
+17. **Regime Permission Changes (intentional)**: `BEAR_TREND: CSM=True` (monitoring experiment — backtest baseline −0.144%/trade); `ELLIOT_V8=False` in all regimes (benched — PF ~1.01 after-tax negative). See EXPERIMENT_LOG §0.2.11.
+18. **NASOS Parameter Sweep**: 2,880 gated configs tested; no config cleared PF > 1.429 in a phase-robust measurement. Current flat 8% config retained (PF 1.30, after-tax −0.177%). See EXPERIMENT_LOG §17.31.
+19. **Scan-Phase Sensitivity Analysis**: CSM Config A is phase-robust (PF 1.39–1.57 across 7 phases, mean 1.50). NASOS is phase-sensitive (PF 0.79–1.45, mean 1.09). Single-phase NASOS measurements are unreliable. See EXPERIMENT_LOG §17.32.
+20. **Relocation-Proof Tools**: All 12 `tools/*.py` scripts + `overnight.sh` use `os.path.dirname(os.path.abspath(__file__))` rather than hardcoded paths. Safe after project folder rename.
+21. **194S TDS confirmed inapplicable**: 1% TDS under Section 194S does NOT apply to USDM futures derivatives (no VDA transfer occurs). Tax question still open on 115BBH vs speculative-business classification — resolve with a CA.
 

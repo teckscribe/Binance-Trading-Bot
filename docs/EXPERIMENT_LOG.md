@@ -1,6 +1,6 @@
 # CSB — Experiment Log
 
-**Last updated:** 2026-08-29
+**Last updated:** 2026-09-12
 **Purpose:** every experiment run, with results, so nothing gets re-tested from scratch.
 Read this before proposing changes. Several ideas below look obviously good and were
 measured to be actively harmful.
@@ -64,6 +64,10 @@ Following an independent 4-agent parallel code audit, 13 specific vulnerabilitie
   - Added `.gitattributes` (`*.sh text eol=lf`) to protect Linux shell scripts from Windows CRLF corruption.
   - Replaced blanket `data/` ignore with targeted `data/*.csv` rules.
   - Removed unused `cryptography>=42.0.0` dependency.
+- **0.2.11 Regime Permission Changes (`modules/regime_engine.py`)** — 2026-09-12, intentional:
+  - `BEAR_TREND: {"CSM": False → True}` — CSM now permitted in BEAR_TREND as a live monitoring experiment. Context: §17.29 measured CSM in BEAR_TREND at 778 trades, −0.144%/trade, −111.9% cumulative (Config A, leak-free 90d). Decision is deliberate; live P&L will confirm or refute.
+  - `BULL_TREND: {"ELLIOT_V8": True → False}` and `BEAR_TREND: {"ELLIOT_V8": True → False}` — ELLIOT_V8 benched in all regimes. Backtest showed PF ~1.01 (after-tax negative under 115BBH, §17.x). Reinstated when live sample reaches ≥100 trades.
+  - Commit: `ad18872`.
 
 ---
 
@@ -2596,9 +2600,56 @@ is gitignored; the repo is source only, ~1.2MB.
 
 ---
 
+### 17.31 NASOS_V4 Parameter Sweep — 2026-08-29 / 2026-09-11
+
+Goal: find a NASOS_V4 config with PF > 1.429 (India 115BBH after-tax break-even, §17.29), mirroring the CSM sweep in §17.27.
+
+**Method:** 2,880 gated configurations over cached 1m/15m arrays. `risk_gates=True` — every candidate trade checked against `MAX_SL_PCT=0.10` before counting, so numbers reflect what the live engine would actually take (39% of 8×ATR signals would be rejected ungated; gating is required for honest counts). Train/test split at midpoint. Minimum 120 trades total, 40 per half.
+
+Grid:
+- SL: flat 3/4/5/6/8/10%, ATR 1.5/2/3/4/6/8×
+- TP: 1.5/2/3/4/6× ATR
+- MIN_STRENGTH: 0 / 0.3 / 0.4 / 0.5 / 0.6 / 0.7
+- MAX_HOLD: off / 240 / 480 / 1440 min
+- Regime: all / BULL+BEAR / RANGING / RANGING+BULL
+
+Current live config (flat 8% SL / TP 3× ATR / no max-hold / BULL+BEAR / MINSTR 0.50):
+```
+162 tr  WIN 75.9%  R:R 0.41  PF 1.30  E +0.587%  aftax -0.177%  sum +95.2%  teE +0.849%
+```
+
+**Result: no configuration cleared PF > 1.429 with positive expectancy in both halves.** Mean PF across surviving configs ≈1.09, range 0.79–1.45. The top single-measurement entry (8×ATR SL, PF 1.46) was phase-dependent — it reversed at a different scan-phase anchor (see §17.32). Current live config (PF 1.30, after-tax −0.177%) is the most interpretable baseline and stays unchanged.
+
+**Conclusion:** NASOS has no demonstrated edge under 115BBH at any configuration tested. Phase sensitivity makes any single-measurement improvement unreliable. Do not tune further until ≥200 live trades accumulate; monitor live P&L.
+
 ---
 
-## 18. FILES TO SYNC TO UBUNTU (as of 2026-08-29) — supersedes §15
+### 17.32 Scan-Phase Sensitivity — CSM robust, NASOS noise-dominated — 2026-08-29 / 2026-09-11
+
+**Background:** The harness `range(1500, len(raw), 60)` anchors scan minutes to the data-file start, not wall-clock time. Shifting the start offset by 0–60 minutes gives 7 independent phase anchors (every ~8 min) with identical data. If a strategy's PF is phase-stable, the edge is real; if it swings widely, the single-phase measurement is dominated by noise.
+
+**CSM Config A** (band 3.0–4.0 / LONG+SHORT / RANGING / Hybrid Ladder / 90d / 100 symbols):
+
+| Phase offset | PF   |
+|-------------|------|
+| +0 min      | 1.57 |
+| +8 min      | 1.50 |
+| +16 min     | 1.46 |
+| +24 min     | 1.42 |
+| +32 min     | 1.48 |
+| +40 min     | 1.44 |
+| +48 min     | 1.39 |
+
+Range **1.39–1.57**, mean **1.50**. All 7 phases positive; 4/7 clear the 1.429 after-tax threshold. **CSM's edge is real, not a scan-phase artifact.**
+
+**NASOS_V4** (flat 8% SL / TP 3× ATR / BULL+BEAR / MINSTR 0.50, same dataset):
+Range **0.79–1.45**, mean **1.09**. Two phases go below PF 1.0 (net loser). The 6×ATR stop variant that appeared best (PF ~1.46) was measured only at the most favourable phase anchor; at other offsets it reverted to near or below 1.0. Reverted to flat 8%: same data, same period, different file-start minute → contradictory results. The recommendation to deploy 6×ATR was reversed.
+
+**Rule going forward:** before deploying any new NASOS (or thinly-sampled) config, run across ≥5 scan-phase offsets. A single measurement that looks better than the flat baseline is more likely a phase artifact than a genuine improvement.
+
+---
+
+## 18. FILES TO SYNC TO UBUNTU (as of 2026-08-29) — supersedes §15, superseded by §19
 
 ### Production — 2026-08-29 session (highest priority)
 
@@ -2656,15 +2707,42 @@ comparison to avoid confounding it. Worth syncing before the next port backtest.
 
 ---
 
+## 19. PRODUCTION RELEASE — FILES DEPLOYED TO UBUNTU (2026-09-11) — supersedes §18
+
+Full production release deployed. All files below were synced to the Ubuntu VPS.
+
+| File | Change | §Ref |
+|---|---|---|
+| `modules/strategies/cross_sectional_momentum.py` | Hybrid Ladder (bar-close Stage 1 + HWM Stages 2/3), Volume Expansion Filter, HWM entry-candle guard | §0.1, §0.2.1, §0.2.4 |
+| `live_scanner.py` | Monotone HWM tracking, `preload_exchange_specs()`, Kronos `log_candidate()`, `_load_positions()` / `reconcile_with_exchange()` | §0.1, §0.2.8, §0.2.9 |
+| `modules/auth_manager.py` | `HTTPAdapter(pool_connections=30, pool_maxsize=30)`, `get_session()` | §0.1 |
+| `modules/data_hub.py` | `MIN_REQ_GAP=0.030s`, `_BTC_REF_TTL=300s` | §0.2.2, §0.2.3 |
+| `modules/order_engine.py` | `exit_source` field stamping (`"bot"` / `"manual"`) | §0.1 |
+| `modules/regime_engine.py` | `BEAR_TREND: CSM=True`, `ELLIOT_V8=False` all regimes (§0.2.11 intentional) | §0.2.11 |
+| `modules/symbol_filter.py` | Expanded `EXCLUDED_BASES` (tokenized equities, leveraged ETFs, commodity tokens) | §0.1 |
+| `modules/ml_engine.py` | Monotone HWM snapshot integration | §0.1 |
+| `modules/watchlist.py` | `MIN_COIN_AGE_DAYS=90` default | §17.23 |
+| `kronos/scorer.py` | `self._tok.eval()`, `self._mdl.eval()` | §0.2.5 |
+| `kronos/requirements.txt` | `safetensors>=0.4.0` added | §0.2.6 |
+| `kronos/shadow_worker.py` | Truncation guard, `endTime`, naive UTC timestamps | §0.2.7 |
+| `data/strategy_overrides.json` | All three strategies `disabled: false` | §0.2 (item 8 in §17.12) |
+| `.env` | `MIN_COIN_AGE_DAYS=90`, `MAX_SL_PCT=0.10`, `CLOSE_ON_SHUTDOWN=false`, `CSM_PROFIT_LADDER=on`, `CSM_ALLOW_LONG=true`, `CSM_ALLOW_SHORT=true` | various |
+| `.gitattributes` | `*.sh text eol=lf` | §0.2.10 |
+| `requirements.txt` | Removed `cryptography`, organized by group | §0.2.10 |
+| `tools/*.py` (12 files) | Relocation-proof: `PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))` | §17.30 |
+| `tools/replay/overnight.sh` | `$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)` | §17.30 |
+
+**Not deployed (backtest tree only):**
+`Tire 1-2 Back Test engine/` — excluded from git per `.gitignore`. Manual sync before next backtest run.
+
+---
+
 ## 9. OPEN WORK, ranked
 
 1. ~~**Run 30-day backtest with §11 changes.**~~ Done (§13.1, §13.4).
 2. ~~**Strategy evaluation via Tire 2 backtest.**~~ Done (§14.2). EI3/VRP/LIQ removed.
-3. **BLOCKER: clear `data/strategy_overrides.json`.** All three strategies are
-   `disabled: true` (§17.12). No entry is possible in any regime until this is
-   cleared — nothing else on this list can progress first.
-4. **Accumulate ≥100 live trades with the current 3-strategy config.** Needs the
-   §17 deploy list on the server. Need a clean live baseline.
+3. ~~**BLOCKER: clear `data/strategy_overrides.json`.**~~ Done 2026-09-11 (§0.2). All three strategies re-enabled.
+4. **Accumulate ≥100 live trades per strategy (clean post-production baseline).** Full production release deployed 2026-09-11 (§19). CSM and NASOS_V4 are live; ELLIOT_V8 benched pending ≥100 trade sample (§0.2.11). Monitor: are CSM BEAR_TREND results consistent with the −0.144%/trade backtest baseline?
 4. ~~**Solve slot starvation.**~~ Addressed: MAX_CONCURRENT=3, per-strategy caps (§14.8).
 5. **Run 90-day Tire 2 backtest for ELLIOT_V8.** Marginal at +0.062% — needs larger
    sample to confirm it's worth keeping. Monitor live performance.
@@ -2701,7 +2779,9 @@ comparison to avoid confounding it. Worth syncing before the next port backtest.
     or expectancy. It outranks any further tuning: under one reading Config A
     is after-tax negative and only 2 of 2,744 configurations survive; under the
     other Config B returns +1.229%/trade. Nothing else on this list changes the
-    answer as much.
+    answer as much. **Note confirmed:** 194S 1% TDS does NOT apply to USDM futures — no VDA transfer occurs (§17.29). Still need a CA to settle the 115BBH vs speculative-business question.
+15. **NASOS_V4 — accumulate ≥200 live trades before any further parameter changes.** §17.31 sweep found no config with PF > 1.429 that is also phase-robust. Current live config (PF 1.30, after-tax −0.177%) stays. Phase sensitivity (§17.32) means single-measurement improvements are unreliable.
+16. **ELLIOT_V8 reinstatement gate.** Currently benched (§0.2.11). Reinstate in BULL_TREND and BEAR_TREND once ≥100 live trades are available for independent validation. Backtest baseline: PF ~1.01 (after-tax negative under 115BBH), +0.062%/trade pre-tax (§14.2, §17.x).
 13. **Re-run anything sourced from `run_backtest_1m` before 2026-08-29**
     (§17.25). §17.13, §17.15 and §17.21 carry correction markers; other entries
     may too.
