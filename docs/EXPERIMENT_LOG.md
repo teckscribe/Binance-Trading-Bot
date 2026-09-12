@@ -1,4 +1,4 @@
-# CSB — Experiment Log
+﻿# CSB — Experiment Log
 
 **Last updated:** 2026-09-12
 **Purpose:** every experiment run, with results, so nothing gets re-tested from scratch.
@@ -73,113 +73,208 @@ Following an independent 4-agent parallel code audit, 13 specific vulnerabilitie
 
 ## 1. CURRENT STATE
 
-### Strategy configuration
+*Last updated: 2026-09-12. Sections below this point may use earlier parameter values
+recorded at the time of their experiment — see this section for the live production state.*
+
+### Strategy configuration (as of 2026-09-12)
 
 ```
-Production set (3):  CSM, VRP, LIQ     — scan/display order in strategy_factory.py
-Permitted:
-  BULL_TREND:  VRP
-  BEAR_TREND:  CSM, LIQ
-  RANGING:     CSM, LIQ
+Production set (3):  CSM, NASOS_V4, ELLIOT_V8   — scan/display order in strategy_factory.py
+
+REGIME_STRATEGY_PERMISSIONS (modules/regime_engine.py):
+  BULL_TREND:  NASOS_V4                      # trend dip-buy; CSM and ELLIOT_V8 off
+  BEAR_TREND:  CSM, NASOS_V4                 # CSM range-continuation + NASOS dip-buy
+  RANGING:     CSM                            # CSM ONLY — proven +666%→+719% (§0.1)
   OVERHEATED:  {} (nothing trades)
-  OVERSOLD:    CSM, LIQ
+  OVERSOLD:    {} (nothing trades)
 ```
 
-VRP re-enabled in BULL_TREND only (2026-08-15, see §11.1). CSM now trades both LONG and
-SHORT (2026-08-15, see §11.2). LIQ remains wired but unproven.
+**Regime permission rationale (§17.20, §17.29, 2026-08-29 → 2026-09-11):**
+- CSM: positive E[net] only in RANGING (§17.21/§17.26/§17.29). BULL_TREND thin and below
+  after-tax PF threshold. BEAR_TREND negative in large sample.
+- NASOS_V4: profitable in BULL_TREND (+0.60%) and BEAR_TREND (+0.41%); loses in RANGING
+  (−0.21%). Gated out of RANGING (§17.20).
+- ELLIOT_V8: marginal overall; currently disabled pending more live data.
 
-**Deleted 2026-08-11** (source files removed, all wiring cleaned):
-`oi_breakouts.py` (OIB), `weekend_anomaly.py` (WKD), `llm_regime.py`, `llm_advisor.py`.
+**Deleted (source files removed, all wiring cleaned):**
+- 2026-08-11: `oi_breakouts.py` (OIB), `weekend_anomaly.py` (WKD), `llm_regime.py`,
+  `llm_advisor.py`. See `docs/LLM_REMOVED.md` for restoration instructions.
+- 2026-08-19: `freqtrade_port_ei3.py` (EI3_V2), `volatility_risk_premium.py` (VRP),
+  `liquidation_cascades.py` (LIQ). All showed negative expectancy on the corrected harness.
+- 2026-08-20: `freqtrade_port_sma.py` (SMA_OFFSET). Negative at every configuration after
+  harness corrections.
 
-### `.env` (Ubuntu, as deployed)
+### `.env` (Ubuntu, as deployed — 2026-09-12)
 
 ```
-LIVE_ENABLED=false               # PAPER mode
+LIVE_ENABLED=true                # ⚠ LIVE mode — real money on Binance
 ACCOUNT_EQUITY_USDT=100.00
 SCAN_INTERVAL_SECONDS=60
-FAST_INTERVAL_SECONDS=2
+FAST_INTERVAL_SECONDS=1
 TOP_N_SYMBOLS=200
 FOCUSED_MODE=true
-FOCUSED_SIZE=100
-MAX_ENTRIES_PER_CYCLE=2          # was 3, reduced to avoid correlated entries (§13.2)
-MAX_CONCURRENT=5                 # was 3 hardcoded, now .env (§13.2)
-MAX_TOTAL_MARGIN_PCT=0.80        # was 0.60 default (§13.2)
-MAX_PER_STRATEGY=CSM:3,LIQ:2,VRP:3  # per-strategy slot caps (§13.3)
-GLOBAL_LEVERAGE=5
+FOCUSED_SIZE=150                 # was 100; enlarged to widen the opportunity set
+MAX_ENTRIES_PER_CYCLE=1          # 1 entry/scan avoids correlated fills (§17.16)
+MAX_CONCURRENT=5
+MAX_TOTAL_MARGIN_PCT=0.9
+MAX_PER_STRATEGY=CSM:2,NASOS_V4:2,ELLIOT_V8:1
+GLOBAL_LEVERAGE=3                # was 5; reduced to lower per-trade ROI volatility
 MAX_LEVERAGED_LOSS_PCT=0.10      # see §5.3 — do not raise without reading it
-MANAGE_ON_BAR_CLOSE=false        # see §5.2
+MAX_SL_PCT=0.10                  # rejects signals with SL > 10% at entry (§17.1)
+MAX_TRADE_LOSS_PCT=0             # 0 = disabled; the 5% guard was reverted (§17.2)
+CLOSE_ON_SHUTDOWN=false          # persists open trades across restarts (§17.4)
+MAX_RESUME_AGE_HOURS=12          # refuses positions unmanaged > 12h on restart
+MIN_COIN_AGE_DAYS=90             # excludes new listings (§17.23)
+MIN_STRENGTH=0.50                # NASOS/ELLIOT gate; CSM pins strength=1.0 (§16.9)
 LOG_LEVEL=INFO
-ML_PHASE=1                       # feature logging only, no trading effect
+ML_PHASE=2                       # features logged + shadow scoring active
 ML_SHADOW=true
+
+# ── CSM config ──────────────────────────────────────────────────────────────
+CSM_ALLOW_LONG=true
+CSM_ALLOW_SHORT=true
+CSM_MOM_LO=3.0                   # Config A band: counter-trend 3.0–4.0x ATR (§17.29)
+CSM_MOM_HI=4.0
+CSM_SL_ATR_LONG=2.0
+CSM_TP_ATR_LONG=4.0
+CSM_SL_ATR_SHORT=2.0
+CSM_TP_ATR_SHORT=4.0
+CSM_MIN_SL_PCT=0.02              # was 0.03; lowered to avoid over-widening in Sep release
+CSM_LEGACY_BE=false
+CSM_PROFIT_LADDER=on             # Dual-Stage Hybrid Ladder (§0.1, §16.8)
+CSM_MAX_HOLD_MIN=1440            # 24h; was 480/8h; extended in Sep release
+CSM_VOL_RATIO_MIN=1.0            # breakout volume confirmation (§0.1, §0.2.1)
 ```
 
-### Hardcoded (NOT in `.env`)
+### CSM Dual-Stage Hybrid Ladder (as of 2026-09-11)
+
+Replaces the legacy single-rung breakeven. Monotone HWM tracks peak favourable excursion.
+
+| Stage | Trigger | Lock | Evaluated on |
+|---|---|---|---|
+| 1 | +1.0% gain | +0.15% (stop to entry+0.15%) | **15m bar close** — avoids 1s noise premature exits |
+| 2 | +2.5% gain | +1.50% | **Peak HWM** — captures intra-bar wick spikes instantly |
+| 3 | +4.0% gain | +2.50% | **Peak HWM** |
+
+`LADDER_HWM_TRIGGER_THRESHOLD = 0.020`. Stage 1 tested on completed-candle `gain`;
+Stages 2 & 3 tested on monotone `hwm`. Original profit ladder (§16.8) used 2%→1%/4%→2.5%,
+revised to the three-stage version for the September release.
+
+### Hardcoded (NOT in `.env`, as of 2026-09-12)
 
 | Constant | Value | Where |
 |---|---|---|
 | `RISK_PCT_PER_TRADE` | 0.01 | `modules/risk_engine.py` |
-| `MAX_CONCURRENT` | 5 (.env) | `modules/risk_engine.py` |
-| `MIN_SL_PCT` | 0.015 (default) | `modules/risk_engine.py` |
-| `MAX_TOTAL_MARGIN_PCT` | 0.80 (.env) | `modules/risk_engine.py` |
-| `MAX_PER_STRATEGY` | CSM:3,LIQ:2,VRP:3 (.env) | `modules/risk_engine.py` |
-| `BE_ATR_MULT` | 1.0 | `modules/strategies/base_strategy.py` |
-| `TRAIL_BAR_MINUTES` | 15 | `modules/strategies/base_strategy.py` |
+| `MIN_SL_PCT` | 0.015 | `modules/risk_engine.py` (global floor; CSM uses its own 0.02) |
 | `ROUND_TRIP_FEE` | 0.0008 | `order_engine.py`, `backtest_optimizer.py` |
-| `SL_ATR_MULT` | 2.0 | `modules/strategies/cross_sectional_momentum.py` |
-| `SL_ATR_MULT_SHORT` | 3.0 | `modules/strategies/cross_sectional_momentum.py` |
-| `TP_ATR_MULT` | 4.0 | `modules/strategies/cross_sectional_momentum.py` |
-| `TP_ATR_MULT_SHORT` | 6.0 | `modules/strategies/cross_sectional_momentum.py` |
-| `MIN_SL_PCT` (CSM) | 0.03 | `modules/strategies/cross_sectional_momentum.py` |
-| `BE_TRIGGER` (CSM) | 0.015 | `modules/strategies/cross_sectional_momentum.py` |
-| `MAX_HOLD_MIN` | 720 (12h) | `modules/strategies/cross_sectional_momentum.py` |
+| `MIN_REQ_GAP` | 0.030s | `modules/data_hub.py` (33 req/s, ~17% below Binance limit) |
+| `_BTC_REF_TTL` | 300s | `modules/data_hub.py` (5-min cache, saves 5 API calls/loop) |
+| `VWAP_PERIOD` | 20 bars | `modules/regime_engine.py` (rolling VWAP, window-invariant) |
 
 ### Environment
 
 - **Ubuntu box** (`/home/psms/ubuntu/program_files/csb`), i3-6100 2c/4t, 8 GB, runs 24/7.
-  venv is `venv/` **not** `.venv/`. Service unit is **`csb`** (not `csb-bot`).
+  venv is **`venv/`** (not `.venv/`). Service units: `csb`, `csb-bot`, `csb-discord`,
+  `csb-web`, `kronos-shadow`, `whale-shadow`. **LIVE_ENABLED=true — real money.**
 - **Windows dev box**, i3-1315U 6c/8t. venv is `.venv/`. **Not IP-whitelisted with
   Binance** — signed API calls fail with `-2015`. Public endpoints only.
-- Data files stop at **2026-08-06**. Refresh from Ubuntu, which is whitelisted.
+- `data/strategy_overrides.json` is NOT synced between dev and Ubuntu. The Ubuntu file
+  is authoritative. Always check it directly on the server before concluding "the bot
+  isn't trading" — three strategies sat `disabled: true` for four days once (§17.12).
+- Backtest data on the dev box stops at **2026-08-06**. Refresh from Ubuntu.
 
 ---
 
 ## 2. HEADLINE BACKTEST NUMBERS
 
-CSM-only, live risk model enforced (real `compute_position_size`, 3 slots, margin
-ceiling, loss caps, compounding), $100 start, `MAX_LEVERAGED_LOSS_PCT=0.10`.
+⚠ **Read this first:** All numbers published before 2026-08-29 came from a harness with a
+look-ahead leak (`run_backtest_1m` sliced `df_1h[df_1h.index <= now]`, admitting up to 59
+minutes of future price). The leak flatters LONG-heavy configs by ~2x and penalises SHORT-heavy
+ones. §17.25 covers the fix; §17.26 has the corrected CSM numbers. **Trust only numbers
+marked "leak-free" or dated 2026-08-29+.**
 
-| Window | Taken | Return | maxDD | Sharpe |
-|---|---|---|---|---|
-| 3-day | 91 | +24.09% | 5.0% | — |
-| 7-day | 180 | +65.89% | 5.0% | — |
-| 15-day | 313 | +161.09% | 7.3% | — |
-| 30-day | 589 | +251.79% | 10.3% | 14.45 |
-| 60-day | 1114 | +492.97% | 12.8% | 10.92 |
-| 90-day | 1650 | +1068.31% | 17.0% | 10.47 |
+---
 
-*(the 3-strategy figures above; CSM-only at 90d is +6254%)*
+### CSM — authoritative (leak-free harness, 2026-08-29+)
 
-**Per-trade, 90 days:**
+**Config A (deployed 2026-08-29, still live 2026-09-12):** CSM_MOM_LO=3.0/HI=4.0,
+ladder=ON, 8h hold, 100 symbols, 90d, 0.08% round-trip + 0.03%/side slippage:
 
-```
-CSM   n=8871   win 65.0%   E +0.632%   PF 1.74
-VRP   n=1520   win 54.1%   E -0.012%   PF 0.99
-LIQ   n=5859   win 48.9%   E -0.039%   PF 0.95
-```
+| N | WIN% | R:R | PF | E[net] | MEDIAN | SUM | HOLD | Worst streak |
+|---|---|---|---|---|---|---|---|---|
+| 1817 | 66.3% | 0.57 | 1.12 | +0.141% | +0.267% | ~+306pp* | — | 11 |
 
-**Per-regime (CSM), 90 days:** BEAR **+1.218%** (825) · RANGING **+0.698%** (5046) ·
-BULL **+0.359%** (3000). Positive in every regime at every window length tested.
+*SUM depends on regime gate. By regime (Config A, no gate):*
 
-**Sharpe is meaningless below ~30 days** (too few daily points). Ignore it on short windows.
+| Regime | N | WIN% | PF | E[net] | SUM |
+|---|---|---|---|---|---|
+| RANGING | 1648 | 66.6% | 1.17 | **+0.186%** | +306.6% |
+| BULL_TREND | 301 | 67.8% | 1.14 | +0.165% | +49.6% |
+| BEAR_TREND | 1243 | 60.7% | 0.70 | **−0.360%** | **−447.8%** |
+
+**BEAR_TREND correctly blocked.** Without the gate, ungated Config A = −0.029% E[net]:
+the regime filter is what makes it work.
+
+**Config B (not deployed — reference):** CSM_MOM_LO=4.0/HI=5.0 (original band),
+ladder=OFF, legacy-BE=OFF:
+
+| N | WIN% | R:R | PF | E[net] | SUM |
+|---|---|---|---|---|---|
+| 644 | 46.1% | 1.68 | **1.44** | **+1.229%** | — |
+
+Config B is the only configuration to clear the after-tax PF threshold of 1.429
+(India 115BBH: 30% on gains, no loss set-off). Config A wins 66% and is after-tax NEGATIVE
+because R:R 0.57 makes the win pile only 1.12× the loss pile. See §17.29 for full analysis.
+
+---
+
+### CSM Regime Gating Sweep (September 2026, 2026-09-11)
+
+Definitive 90-day sweep confirming RANGING as the only viable CSM regime:
+
+| Regime | Net Return | Win Rate | Notes |
+|---|---|---|---|
+| **RANGING** | **+666.0% → +719.7%** | 66.3% | Max losing streak 11. Proven alpha. |
+| BULL_TREND | −130.5% | — | Short wicks squeezed, late longs top-ticked. |
+| BEAR_TREND | negative | — | Dip-buying longs trapped in trend bleed. |
+
+This is the backtest that locked CSM to RANGING-only in production.
+
+---
+
+### NASOS_V4 and ELLIOT_V8 (2026-08-29, corrected harness)
+
+90d / 100 symbols, 0.03%/side slippage, gated (`BT_MIN_STRENGTH=0.50`):
+
+| Strategy | N | E[net] | PF | Trend regimes | RANGING |
+|---|---|---|---|---|---|
+| NASOS_V4 | 875 | +0.350% gated | 1.16 | BULL +0.60%, BEAR +0.41% | −0.21% |
+| ELLIOT_V8 | ~430 gated | marginal | ~1.01 | BULL +0.44%, BEAR −0.25% | −0.24% |
+
+NASOS and CSM are **mirror images**: CSM earns in RANGING, loses in trends; NASOS does
+the opposite. That is real diversification (§16.14).
+
+---
+
+### The 60× entry-cadence gap
+
+Backtest uses `STEP=60` (one evaluation per 60-minute bar). Live scans every 60 **seconds**.
+Live sees strictly more opportunities. This gap cannot be closed in the current harness — it
+means per-trade expectancy from backtests understates what live will see in signal count,
+while the price at entry may differ. Documented in §17.9; not fixed.
+
+---
 
 ### Converting backtest % to account %
 
-The per-trade figures are on **notional**, not equity. Measured live: mean notional
-**$27.28 on $100 = 0.27×**. So `+0.632%/trade → ~+0.199% of equity → ~$0.20 per trade`.
+The per-trade figures are on **notional**, not equity. Mean notional on $100 ≈ 0.27× equity.
+So `+0.186%/trade → ~+0.05% of equity → ~$0.05 per trade` at Config A parameters.
 
-A "+650%" style figure is a **sum of per-trade percentages**, not an account return.
+A "+666%" style figure is a **compounded portfolio return**, not a sum of per-trade percentages.
 
-**Statistical floor: ~128 trades before the edge outruns 2σ of noise** (per-trade σ ≈ $1.12).
+**Statistical floor: ≥128 trades before the edge outruns 2σ of noise** (per-trade σ ≈ $1.12).
+
+**Sharpe is meaningless below ~30 days** (too few daily points). Ignore it on short windows.
 
 ---
 
@@ -188,7 +283,7 @@ A "+650%" style figure is a **sum of per-trade percentages**, not an account ret
 Every one improved per-trade quality and **lost money**, because with 3 slots against
 11,363 slot-rejected signals, discarding candidates costs more than the weak ones lose.
 
-### 3.1 Coin blacklisting — **FAILED**
+### 3.1 Coin blacklisting — **FAILED** *(2026-08-12)*
 
 Trained on days 90→30, traded days 30→0:
 
@@ -207,7 +302,7 @@ blacklist the losers   n=2513   E +0.808%   +264.94%     ← 82pp WORSE
 CSM needs a >3× ATR move in 24h, which a $50bn coin cannot produce. A **liquidity or
 market-cap filter** has a mechanism behind it; a blacklist just memorises one window.
 
-### 3.2 Time-of-day filtering — **FAILED** (and the intuition was backwards)
+### 3.2 Time-of-day filtering — **FAILED** *(2026-08-12)* (and the intuition was backwards)
 
 Hypothesis was IST 23:00–07:00 being most profitable. It is the **worse** half:
 
@@ -234,7 +329,7 @@ The learned-best-8 and the proposed window had **zero hours in common**.
 thin Asian-hours liquidity). It is not actionable at 3 slots. **It becomes actionable if
 `MAX_CONCURRENT` is raised.**
 
-### 3.3 LIQ / VRP in any regime — **FAILED**
+### 3.3 LIQ / VRP in any regime — **FAILED** *(2026-08-12 → 2026-08-19)*
 
 Four permission matrices, same 16,250-trade set:
 
@@ -252,7 +347,7 @@ portfolio is **value-destroying, not diversifying**.
 ⚠️ The **15-day window said the opposite** and its matrix scored **worst of the four**.
 Do not re-derive strategy permissions from a window under 30 days.
 
-### 3.4 `BE_ATR_MULT` tuning — **NO CHANGE WARRANTED**
+### 3.4 `BE_ATR_MULT` tuning — **NO CHANGE WARRANTED** *(2026-08-13)*
 
 | MULT | 30d return | 30d maxDD | ret/dd | 90d return | BE% |
 |---|---|---|---|---|---|
@@ -271,7 +366,7 @@ Note the same trap: expectancy rises monotonically (+0.710% → +0.837%) while p
 return does not, because trade count falls 3109 → 2485 (unscratched trades hold their
 slot longer).
 
-### 3.5 LLM regime override — **ZERO VALUE, REMOVED**
+### 3.5 LLM regime override — **ZERO VALUE, REMOVED** *(2026-08-11)*
 
 - CSM is permitted in all three live regimes, so the regime label **cannot change which
   trades fire**. Contribution is exactly zero.
@@ -445,7 +540,13 @@ falls 70% at 0.10% — small per-trade costs compound hard across ~1,650 trades.
 
 ## 7. LIVE / PAPER RESULTS TO DATE
 
-All PAPER (`LIVE_ENABLED=false`).
+⚠ **Mode change 2026-09-11:** `LIVE_ENABLED` switched from `false` to `true`.
+All results below the divider are LIVE (real money on Binance). Do not compare
+paper and live P&L figures directly — they use different fill paths.
+
+---
+
+All PAPER (`LIVE_ENABLED=false`) until 2026-09-11.
 
 ### Pre-§11 sessions (LONG-only CSM, old parameters): 134 trades, +$12.83
 
@@ -485,6 +586,20 @@ OIB:   5t WR=60%  PnL=+1.9%
 **Do not over-read single sessions.** A 5-trade session read as "80% BE_HIT" and drove an
 entire investigation; the real rate is 37%. Per-trade σ is $1.12, so a 5-trade session has
 σ ≈ $2.5 — noise dwarfs the ~$1.00 expected edge.
+
+---
+
+### LIVE results (2026-09-11+, Config A + Dual-Stage Hybrid Ladder)
+
+*Accumulating. Target: ≥100 live trades before any configuration changes.*
+
+First live session (2026-08-28, paper — Config A first-day audit):
+- 5 open, 2 closed, session +$1.00. ROI arithmetic verified trade-by-trade (§17.18).
+- HYPEUSDT: SL_HIT −$1.03 (−9.11% ROI = 3.00% stop × 3x leverage — display artifact, not error).
+- ENAUSDT: TP_HIT +$2.03 (+19.66% ROI). 1% equity risk confirmed on every position.
+
+Bot switched to **LIVE_ENABLED=true** on 2026-09-11 with the production release.
+Accumulating real-money trades. Check `logs/live/` and the web dashboard for current results.
 
 ---
 
@@ -2739,58 +2854,59 @@ Full production release deployed. All files below were synced to the Ubuntu VPS.
 
 ## 9. OPEN WORK, ranked
 
+*Updated 2026-09-12.*
+
+### Critical — do before any tuning
+
 1. ~~**Run 30-day backtest with §11 changes.**~~ Done (§13.1, §13.4).
 2. ~~**Strategy evaluation via Tire 2 backtest.**~~ Done (§14.2). EI3/VRP/LIQ removed.
-3. ~~**BLOCKER: clear `data/strategy_overrides.json`.**~~ Done 2026-09-11 (§0.2). All three strategies re-enabled.
-4. **Accumulate ≥100 live trades per strategy (clean post-production baseline).** Full production release deployed 2026-09-11 (§19). CSM and NASOS_V4 are live; ELLIOT_V8 benched pending ≥100 trade sample (§0.2.11). Monitor: are CSM BEAR_TREND results consistent with the −0.144%/trade backtest baseline?
-4. ~~**Solve slot starvation.**~~ Addressed: MAX_CONCURRENT=3, per-strategy caps (§14.8).
-5. **Run 90-day Tire 2 backtest for ELLIOT_V8.** Marginal at +0.062% — needs larger
-   sample to confirm it's worth keeping. Monitor live performance.
-6. **Add slippage** to backtest + paper from one shared `.env` value.
-7. ~~**Add symbol cooldowns to the backtest.**~~ Done — harness models
-   `LOSS_COOLDOWN_MINUTES` (§17.9).
-7a. **Re-baseline NASOS_V4 and ELLIOT_V8 on the fixed harness.** §17.8 only
-   proved CSM was mis-routed; the ports were always on the 1m path, but their
-   numbers predate the `MAX_SL_PCT` port into the BT engine (§17.11).
-7b. ~~**Sync the backtest tree's `regime_engine.py`.**~~ Done 2026-08-29 (§17.30).
-   It was NOT inert: the stale dict let 1,243 BEAR_TREND shorts into a
-   RANGING-only verification and made a working config look broken.
-7b0. **Measure slot share across all 3 strategies at MAX_ENTRIES_PER_CYCLE 1 vs 3**
-   (§17.16). CSM's constant strength=1.0 outranks the ports' RSI-derived score,
-   which floors at 0 above RSI 35 — derived from the formulas, never measured.
-   This is the only way to price what the throttle costs in strategy mix.
-7c0. **Validate the CSM >=4.8x band cut out-of-sample** (§17.15). t=-2.86
-   in-sample, negative in both sub-periods, worth +153pp. Use the 130-symbol
-   40-day cache before editing `cross_sectional_momentum.py`.
-7c. **Backtest the universe sort key.** `sqrt(volume) x range` reaches 12.43%
-   median range at unchanged liquidity (§17.10). Hypothesis only.
-7d. **Close the 60x entry-cadence gap** between live (60s) and harness
-   (`STEP=60` minutes), or quantify what it costs (§17.9).
-8. **Bump `fetch_btc_reference` 50 → 200 bars** so ADX converges.
-9. Fix the tick-path stop fill (§4.5) so paper matches live under `MANAGE_ON_BAR_CLOSE=false`.
-10. ML Phase 2 unlocks at 50 completed trades.
-11. **Decide on the dead code in §17.17** — `freqtrade_port_sma.py`, root
-    `list_optimizer.py`, `freqtrade_port_ichi.py` and nine unused functions.
-    All inert; deletion is a housekeeping call, not a fix.
+3. ~~**BLOCKER: clear `data/strategy_overrides.json`.**~~ Done 2026-09-11 (§0.2 audit).
+4. **Accumulate ≥100 live trades with no config changes.** Bot is LIVE as of 2026-09-11.
+   CSM (RANGING only) and NASOS_V4 (trends only) are the active producers. ELLIOT_V8 is
+   benched. No parameter changes until this completes.
+5. **Resolve crypto-F&O tax classification with a CA** (§17.29). India 115BBH (30% on gains,
+   no loss set-off) gives PF > 1.429 as break-even. Config A (deployed, PF 1.12) is
+   after-tax NEGATIVE under that reading. Config B (PF 1.44) is the only backtested config
+   that clears it. Outranks every other item. Note: 194S 1% TDS does NOT apply to USDM
+   futures — no VDA transfer occurs. Still need a CA on 115BBH vs speculative-business.
 
-12. **Resolve the crypto-F&O tax classification with a CA** (§17.29). Whether
-    perps fall under 115BBH (30%, no loss set-off) or speculative-business
-    treatment (slab, set-off allowed) decides whether to optimise profit factor
-    or expectancy. It outranks any further tuning: under one reading Config A
-    is after-tax negative and only 2 of 2,744 configurations survive; under the
-    other Config B returns +1.229%/trade. Nothing else on this list changes the
-    answer as much. **Note confirmed:** 194S 1% TDS does NOT apply to USDM futures — no VDA transfer occurs (§17.29). Still need a CA to settle the 115BBH vs speculative-business question.
-15. **NASOS_V4 — accumulate ≥200 live trades before any further parameter changes.** §17.31 sweep found no config with PF > 1.429 that is also phase-robust. Current live config (PF 1.30, after-tax −0.177%) stays. Phase sensitivity (§17.32) means single-measurement improvements are unreliable.
-16. **ELLIOT_V8 reinstatement gate.** Currently benched (§0.2.11). Reinstate in BULL_TREND and BEAR_TREND once ≥100 live trades are available for independent validation. Backtest baseline: PF ~1.01 (after-tax negative under 115BBH), +0.062%/trade pre-tax (§14.2, §17.x).
-13. **Re-run anything sourced from `run_backtest_1m` before 2026-08-29**
-    (§17.25). §17.13, §17.15 and §17.21 carry correction markers; other entries
-    may too.
-14. **Decide on CSM in BULL_TREND** (§17.29). Positive at +0.165% / PF 1.14 but
-    n=301 and below the after-tax threshold. Currently blocked. One line in
-    `regime_engine.py`.
+### Strategy decisions (after live baseline)
 
+6. **Decide on Config B vs Config A** (§17.29). Config B is measurably better under both tax
+   readings. Reachable via .env only: CSM_MOM_LO=4.0 CSM_MOM_HI=5.0 CSM_PROFIT_LADDER=off
+   CSM_LEGACY_BE=false. Config A chosen for lower losing streak (11 vs 21). Switch after
+   tax question resolved and >= 100 live trades logged.
+7. **Validate CSM >=4.8x band cut out-of-sample** (§17.15). t=-2.86 in-sample, negative
+   in both sub-periods, worth +153pp. Test on 130-symbol 40-day cache first.
+8. **Decide on CSM in BULL_TREND** (§17.29). Positive at +0.165% / PF 1.14 but n=301 and
+   below after-tax PF threshold. Currently blocked. One line in regime_engine.py.
+9. **ELLIOT_V8 reinstatement** (§0.2). Currently benched in all regimes. Re-enable in
+   BULL_TREND + BEAR_TREND after >= 100 live trades available for independent validation.
+   Backtest baseline: PF ~1.01, after-tax negative under 115BBH.
+10. **Measure slot share across strategies** (§17.16). CSM strength=1.0 outranks ports'
+    RSI-derived score at MAX_ENTRIES_PER_CYCLE=1. Never measured — quantify before
+    changing MAX_ENTRIES_PER_CYCLE.
+11. **NASOS_V4 — accumulate >= 200 live trades** before any parameter changes.
 
----
+### Backtest / harness
+
+12. **Re-run anything from run_backtest_1m before 2026-08-29** (§17.25). §17.13, §17.15,
+    §17.21 carry correction markers. Any pre-2026-08-29 port figure predates MAX_SL_PCT
+    port into the BT engine (§17.11).
+13. ~~**Add symbol cooldowns to backtest.**~~ Done (§17.9).
+14. ~~**Sync backtest tree regime_engine.py.**~~ Done 2026-08-29 (§17.30).
+15. **Backtest the universe sort key** (§17.10). sqrt(volume) x range reaches 12.43% median
+    range at unchanged liquidity. Hypothesis — must be measured.
+16. **Close or quantify the 60x entry-cadence gap** (§17.9). Live: every 60s. Harness: every
+    60 min. Cannot be fixed in the current harness.
+17. **Add slippage parameter** to backtest from one shared .env value.
+
+### Infrastructure / hygiene
+
+18. **Bump fetch_btc_reference 50 → 200 bars** so ADX warm-up converges.
+19. ~~**ML_PHASE=2 active**~~ (was: Phase 2 unlocks at 50 trades). Phase 3 target: 500 live trades.
+20. **Decide on dead code** (§17.17): freqtrade_port_sma.py, root list_optimizer.py,
+    freqtrade_port_ichi.py, 9 unused functions. All inert; housekeeping only.
 
 ## 10. HARD-WON LESSONS
 
