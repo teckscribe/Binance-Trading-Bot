@@ -7,34 +7,63 @@ measured to be actively harmful.
 
 ---
 
-## 0. PRODUCTION RELEASE (2026-09-11)
+### 0. PRODUCTION RELEASE & HARDENING (2026-09-11)
 
-### 0.1 Monotone High-Water Mark (HWM) & Dual-Stage Hybrid Ladder
-- **Peak Favourable Excursion (HWM)**: Monotonically tracks peak favorable excursion since entry (hwm = max(prev_hwm, peak_gain)).
-- **Dual-Stage Hybrid Evaluation**:
-  - Stage 1 (+1.0% trigger → +0.15% lock): Evaluated on **15m bar close** (gain). Prevents 1-second noise whipsaws from locking breakeven prematurely right after entry.
-  - Stage 2 (+2.5% trigger → +1.50% lock) & Stage 3 (+4.0% trigger → +2.50% lock): Evaluated on **Peak HWM** (hwm). Captures rapid intra-bar wick spikes instantly.
-- **Threshold**: LADDER_HWM_TRIGGER_THRESHOLD = 0.020.
-
-### 0.2 Breakout Volume Expansion Filter
-- **Hypothesis**: Require current 1h breakout volume to be ≥ 1.0× the 24h rolling average hourly volume.
-- **Result**: Filters out low-liquidity fake-outs on illiquid altcoins. Dynamic signal strength scaled from 0.5 to 2.5 based on volume ratio.
-- **Config**: CSM_VOL_RATIO_MIN = 1.0.
-
-### 0.3 90-Day Regime Gating Sweep
-- **90-Day Backtest Analysis**:
+### 0.1 Production Release Deployment (2026-09-11 18:00–21:30 IST)
+- **Monotone High-Water Mark (HWM) & Dual-Stage Hybrid Ladder**:
+  - Monotonically tracks peak favorable excursion since entry (`hwm = max(prev_hwm, peak_gain)`).
+  - **Dual-Stage Hybrid Evaluation**:
+    - Stage 1 (+1.0% trigger → +0.15% lock): Evaluated on **15m bar close** (`gain`). Prevents 1-second noise whipsaws from locking breakeven prematurely right after entry.
+    - Stage 2 (+2.5% trigger → +1.50% lock) & Stage 3 (+4.0% trigger → +2.50% lock): Evaluated on **Peak HWM** (`hwm`). Captures rapid intra-bar wick spikes instantly.
+  - Threshold: `LADDER_HWM_TRIGGER_THRESHOLD = 0.020`.
+- **Breakout Volume Expansion Filter**:
+  - Requires breakout volume confirmation against 24h rolling average hourly volume.
+  - Filters out low-liquidity fake-outs on illiquid altcoins. Dynamic signal strength scaled from 0.5 to 2.5 based on volume ratio.
+  - Config: `CSM_VOL_RATIO_MIN = 1.0`.
+- **90-Day Regime Gating Sweep**:
   - RANGING: **+666.0% ~ +719.7% net return** (66.3% win rate, max loss streak 11).
   - BULL_TREND: **−130.5% loss** (short wicks squeezed, late longs top-ticked).
   - BEAR_TREND: Dip-buying longs trapped in systematic trend bleed.
-- **Rule**: CSM remains strictly gated to RANGING markets where it possesses massive alpha.
+  - Rule: CSM remains strictly gated to RANGING markets where it possesses proven alpha.
+- **Latency & Architecture Optimizations**:
+  - `preload_exchange_specs()` warms `LOT_SIZE` `stepSize` and `PRICE_FILTER` `tickSize` on startup in 1 bulk API call (0ms order path).
+  - `modules/auth_manager.py` equipped with `HTTPAdapter(pool_connections=30, pool_maxsize=30)` and `get_session()`.
+- **Tokenized Asset & ETF Exclusion Filter**:
+  - Added SKHYNIX, MU, SNDK, SAMSUNG, QQQ, SPY, EWY, KORU, SOXS, XAUT, PAXG, USDE, EUR, GBP to `EXCLUDED_BASES` in `modules/symbol_filter.py`.
+- **Audit Field Tagging**:
+  - Added `exit_source: "bot"` on strategy automated closes and `"manual"` on exchange-reconciled closes in `order_engine.py` for ledger auditing.
 
-### 0.4 Latency & Architecture Optimizations
-- **0ms Order Warmup**: preload_exchange_specs() warms LOT_SIZE stepSize and PRICE_FILTER 	ickSize on startup in 1 bulk API call.
-- **Zero-Handshake Session Pooling**: uth_manager.py equipped with HTTPAdapter(pool_connections=30, pool_maxsize=30) and get_session().
-- **Rate-Gate**: Lowered MIN_REQ_GAP to 0.025s (25ms) and _BTC_REF_TTL to 60s in data_hub.py.
-
-### 0.5 Tokenized Asset & ETF Exclusion Filter
-- Added SKHYNIX, MU, SNDK, SAMSUNG, QQQ, SPY, EWY, KORU, SOXS, XAUT, PAXG, USDE, EUR, GBP to EXCLUDED_BASES in modules/symbol_filter.py.
+### 0.2 Production Cross-Check Audit & Hardening (2026-09-11 23:20–23:45 IST)
+Following an independent 4-agent parallel code audit, 13 specific vulnerabilities and stability points were resolved:
+- **0.2.1 Hourly Volume Filter Time-of-Hour Gating Fix (`modules/strategies/cross_sectional_momentum.py`)**:
+  - *Problem*: Comparing in-progress 1h candle volume (`iloc[-1]`) against 24 full-hour completed candles caused an artificial volume starvation gate blocking entries during the first 30–45 minutes of every hour.
+  - *Fix*: Switched to the last completed 1h candle (`iloc[-2]`) compared against the preceding 24 completed candles (`iloc[-26:-2]`).
+- **0.2.2 Binance Rate-Limit Headroom Calibration (`modules/data_hub.py`)**:
+  - *Problem*: `MIN_REQ_GAP = 0.025s` (40 req/s) sat exactly on Binance's 2400 req/min limit, leaving zero buffer for concurrent order routing or account syncs.
+  - *Fix*: Increased to `MIN_REQ_GAP = 0.030s` (33 req/s), establishing a ~17% safety margin to guarantee immunity from `429` rate-limit bans.
+- **0.2.3 BTC Reference Cache TTL Alignment (`modules/data_hub.py`)**:
+  - *Problem*: `_BTC_REF_TTL = 60s` exactly matched the 60s scan interval, causing cache expirations every loop and burning 5 API calls per scan.
+  - *Fix*: Increased TTL to 300s (5 minutes). Saves 5 signed API calls per cycle while preserving regime accuracy.
+- **0.2.4 HWM Entry-Candle Overlap Guard (`modules/strategies/cross_sectional_momentum.py`)**:
+  - *Problem*: When managing a newly opened trade, `df.iloc[-1]` could contain pre-fill price extremes from the entry minute, prematurely ratcheting stops into phantom stop-outs.
+  - *Fix*: Added timestamp overlap detection; if bar timestamp $\le$ `entry_time`, `_px_hi` and `_px_lo` are clamped to `current_price`.
+- **0.2.5 Kronos Model Inference Mode (`kronos/scorer.py`)**:
+  - *Problem*: PyTorch model and tokenizer defaulted to `training=True`, causing stochastic dropout during inference.
+  - *Fix*: Added explicit `self._tok.eval()` and `self._mdl.eval()` calls upon initialization.
+- **0.2.6 Kronos Safetensors Dependency (`kronos/requirements.txt`)**:
+  - Added `safetensors>=0.4.0` required for HuggingFace Hub model loading.
+- **0.2.7 Shadow Worker Truncation & History Robustness (`kronos/shadow_worker.py`)**:
+  - Added file-size check (`if os.path.getsize(REQ) < off: off = 0`) to prevent queue deadlocks on log rotation.
+  - Added `endTime` parameter to `_fetch_15m()` and normalized all candidate timestamps to naive UTC for historical scoring.
+- **0.2.8 Candidate Shadow Logging Pipeline (`live_scanner.py`)**:
+  - Wired `kronos.shadow_client.log_candidate()` into `live_scanner.py` candidate generation loop so CSM setups are recorded into `shadow_requests.jsonl` in real time.
+- **0.2.9 Mid-Trade Restart Recovery & Persistence (`live_scanner.py`)**:
+  - Validated and configured `CLOSE_ON_SHUTDOWN=false` in `.env`.
+  - Open trades persist every cycle to `data/open_positions.json` (including trailed SL and peak HWM) and automatically rehydrate on startup via `_load_positions()` and `reconcile_with_exchange()`.
+- **0.2.10 Cross-Platform Line Endings & Dependencies (`.gitattributes`, `requirements.txt`, `.gitignore`)**:
+  - Added `.gitattributes` (`*.sh text eol=lf`) to protect Linux shell scripts from Windows CRLF corruption.
+  - Replaced blanket `data/` ignore with targeted `data/*.csv` rules.
+  - Removed unused `cryptography>=42.0.0` dependency.
 
 ---
 
