@@ -17,8 +17,11 @@ from dotenv import load_dotenv
 _PROJECT = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_PROJECT, ".env"))
 
+from modules import settings_manager as cfg
+cfg.migrate_from_env()
+
 NGROK_AUTHTOKEN = os.getenv("NGROK_AUTHTOKEN", "")
-NGROK_ENABLED = os.getenv("NGROK_ENABLED", "true").lower() == "true"
+NGROK_ENABLED = cfg.get("NGROK_ENABLED")     # read once; restart this service to apply
 ACTIVE_WEB_PORT = 8102
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

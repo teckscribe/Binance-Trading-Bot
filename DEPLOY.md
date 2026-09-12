@@ -64,6 +64,23 @@ venv/bin/python3 healthcheck.py
 env vars, and probes Binance / Telegram / Discord. Expect `0 fail` before
 starting any service.
 
+### Runtime settings live in `data/settings.json`
+
+`.env` holds only secrets and `LIVE_ENABLED`. Every tunable (equity,
+intervals, risk caps, leverage, CSM/NASOS parameters, ML phase, toggles, log
+level) is in `data/settings.json`, which the scanner re-reads every cycle —
+so a change from the dashboard Settings tab or the Telegram/Discord bots
+applies within seconds, no restart. Only `NGROK_ENABLED` still needs its
+service restarted.
+
+Upgrading a VPS whose `.env` still carries those keys needs no manual step:
+the first service to start seeds `data/settings.json` from them, and from
+then on the `.env` copies are ignored (delete them at your leisure). Never
+rsync `data/settings.json` from a dev box over a live one. The key list,
+types and bounds are `modules/settings_manager.py` (`SPEC`); a value set in
+the shell (`CSM_MOM_LO=3.5 venv/bin/python3 backtest_optimizer.py`) still
+overrides the file, which is how backtest sweeps work.
+
 ### Pin your dependencies first
 
 `requirements.txt` leaves `pandas` and `numpy` unpinned. On this machine they

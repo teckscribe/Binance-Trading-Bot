@@ -89,9 +89,13 @@ from modules.strategies.freqtrade_port_nasos       import NASOSv4Port
 from modules.strategies.freqtrade_port_elliot      import ElliotV8Port
 
 from modules.risk_engine import (
-    MAX_CONCURRENT, MAX_MARGIN_PCT,
-    DAILY_LOSS_CAP, WEEKLY_LOSS_CAP,
+    MAX_MARGIN_PCT, max_concurrent, daily_loss_cap, weekly_loss_cap,
 )
+
+# Snapshot the runtime-editable limits once for this offline run.
+MAX_CONCURRENT  = max_concurrent()
+DAILY_LOSS_CAP  = daily_loss_cap()
+WEEKLY_LOSS_CAP = weekly_loss_cap()
 
 logging.getLogger("RegimeEngine").setLevel(logging.WARNING)
 
@@ -1016,7 +1020,8 @@ def simulate_portfolio(trades, capital=INITIAL_CAPITAL, leverage=LEVERAGE,
     if not trades:
         return None
 
-    from modules.risk_engine import compute_position_size, MAX_TOTAL_MARGIN_PCT
+    from modules.risk_engine import compute_position_size, max_total_margin_pct
+    MAX_TOTAL_MARGIN_PCT = max_total_margin_pct()
 
     # ── Live gates this layer used to ignore ─────────────────────────────────
     # live_scanner enforces all three on every entry; without them the

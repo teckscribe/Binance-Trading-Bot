@@ -636,6 +636,7 @@ function renderSettings(d) {
               <div class="set-label">
                 <label for="set-f-${f.key}">${setEsc(f.label || f.key)}</label>
                 <code>${setEsc(f.key)}</code>
+                ${f.restart ? `<span class="pill pill-amber set-pill">restart</span>` : ""}
                 ${f.help ? `<span class="set-help">${setEsc(f.help)}</span>` : ""}
               </div>
               <div class="set-control">${setControl(f)}</div>

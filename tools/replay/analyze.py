@@ -93,9 +93,9 @@ def acct(trades, capital):
     if not trades:
         return None
     return simulate_portfolio(
-        trades, capital=capital, slots=RE.MAX_CONCURRENT,
-        margin_pct=RE.MAX_MARGIN_PCT, daily_cap=RE.DAILY_LOSS_CAP,
-        weekly_cap=RE.WEEKLY_LOSS_CAP, label="", verbose=False)
+        trades, capital=capital, slots=RE.max_concurrent(),
+        margin_pct=RE.MAX_MARGIN_PCT, daily_cap=RE.daily_loss_cap(),
+        weekly_cap=RE.weekly_loss_cap(), label="", verbose=False)
 
 
 def line(tag, trades, capital, base=None, note=""):

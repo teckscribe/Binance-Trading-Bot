@@ -25,7 +25,7 @@ Loop cycle (every SCAN_INTERVAL seconds):
 
 Position cap rules:
   - MAX_CONCURRENT = 3 live positions at once
-  - MAX_ENTRIES_PER_CYCLE = reads from .env (default 2)
+  - MAX_ENTRIES_PER_CYCLE = from data/settings.json (default 2)
   - Next trade only opens after one of the 3 closes
 
 Risk gates checked before any new entry:
@@ -50,11 +50,16 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # ── Load .env before any module imports that read env vars ────────────────────
+# .env now carries only secrets and LIVE_ENABLED; every tunable lives in
+# data/settings.json (see modules/settings_manager.py) and is hot-reloaded.
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_ROOT, ".env"))
 
+from modules import settings_manager as cfg
+cfg.migrate_from_env()      # first run after upgrade: seed settings.json from .env
+
 # ── Logging setup (goes to stdout → captured by journald) ─────────────────────
-_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+_LOG_LEVEL = cfg.get("LOG_LEVEL")
 logging.basicConfig(
     level    = getattr(logging, _LOG_LEVEL, logging.INFO),
     format   = "%(asctime)s | %(name)-18s | %(levelname)-8s | %(message)s",
@@ -67,7 +72,7 @@ log = logging.getLogger("LiveScanner")
 # ── Project imports ───────────────────────────────────────────────────────────
 from modules.auth_manager      import validate_credentials, test_binance_connection
 from modules.symbol_filter     import get_top_symbols
-from modules.watchlist         import get_watchlist, get_focused_watchlist, FOCUSED_SIZE
+from modules.watchlist         import get_watchlist, get_focused_watchlist
 from modules.data_hub          import (
     fetch_all_symbols, fetch_btc_reference, fetch_active_positions_data
 )
@@ -78,7 +83,6 @@ from modules.risk_engine       import (
     compute_position_size, compute_liq_price,
     is_daily_floor_hit, is_position_cap_hit, is_strategy_cap_hit,
     is_loss_cap_hit, record_trade_pnl, get_loss_status,
-    MAX_CONCURRENT, MAX_TOTAL_MARGIN_PCT, MAX_TRADE_LOSS_PCT,
 )
 from modules.order_engine      import (
     OrderEngine, LIVE_ENABLED, get_account_equity, update_stop_order,
@@ -107,13 +111,11 @@ from discord_notifier          import (
 )
 
 # ── Telegram toggle ──────────────────────────────────────────────────────────
-# Set TELEGRAM_ENABLED=false in .env to disable Telegram notifications.
+# TELEGRAM_ENABLED=false (Settings tab) disables Telegram notifications.
 # Discord always sends. _tg() wraps Telegram-only; _safe() sends to both.
-_TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "true").lower() == "true"
-
 def _tg(fn, *args, **kwargs):
     """Call a telegram_notifier function only if Telegram is enabled."""
-    if _TELEGRAM_ENABLED:
+    if cfg.get("TELEGRAM_ENABLED"):
         try:
             fn(*args, **kwargs)
         except Exception as exc:
@@ -163,19 +165,27 @@ from modules.ml_engine         import (
 # live-vs-backtest divergence attributable to the engine rather than to an
 # optional subsystem. See docs/LLM_REMOVED.md to restore either.
 
-# ── Configuration from .env ───────────────────────────────────────────────────
-SCAN_INTERVAL   = int(os.getenv("SCAN_INTERVAL_SECONDS",  "60"))
-FAST_INTERVAL   = int(os.getenv("FAST_INTERVAL_SECONDS",  "10"))
-TOP_N_SYMBOLS   = int(os.getenv("TOP_N_SYMBOLS",           "100"))
+# ── Runtime configuration ─────────────────────────────────────────────────────
+# These module globals are a SNAPSHOT of data/settings.json, refreshed by
+# _refresh_settings() at the top of every loop cycle. Nothing below is read
+# from .env any more, so an edit from the dashboard, Telegram or Discord takes
+# effect on the next cycle without a restart. The rest of this file uses the
+# names exactly as before.
 
-# ── Focused mode: scan ONLY top-5 coins (trades both sides with all strategies)
-# Set FOCUSED_MODE=true in .env to activate. FOCUSED_SIZE controls coin count.
-FOCUSED_MODE    = os.getenv("FOCUSED_MODE", "false").lower() == "true"
-_FOCUSED_N      = int(os.getenv("FOCUSED_SIZE", str(FOCUSED_SIZE)))
+# SCAN_INTERVAL / FAST_INTERVAL — how often to look for new entries / manage
+# open positions. TOP_N_SYMBOLS — universe size when focused mode is off.
+SCAN_INTERVAL   = cfg.get("SCAN_INTERVAL_SECONDS")
+FAST_INTERVAL   = cfg.get("FAST_INTERVAL_SECONDS")
+TOP_N_SYMBOLS   = cfg.get("TOP_N_SYMBOLS")
 
-# Account equity — starts from .env, then refreshed from Binance every 15 min.
-# Default is $10 (not $1000) — if .env is missing the key this is the safe floor.
-ACCOUNT_EQUITY  = float(os.getenv("ACCOUNT_EQUITY_USDT",  "10.0"))
+# ── Focused mode: scan ONLY the top-N curated coins (both sides, all strategies)
+FOCUSED_MODE    = cfg.get("FOCUSED_MODE")
+_FOCUSED_N      = cfg.get("FOCUSED_SIZE")
+
+# Account equity — starts from settings, then refreshed from Binance every
+# EQUITY_REFRESH_INTERVAL in LIVE mode. Default is $10 (not $1000) — the safe
+# floor if the setting is missing.
+ACCOUNT_EQUITY  = cfg.get("ACCOUNT_EQUITY_USDT")
 
 # Immutable starting figure for PAPER mode. ACCOUNT_EQUITY drifts as simulated
 # trades close; this stays put so paper_equity can tell start from realized.
@@ -195,7 +205,7 @@ PAPER_STARTING_EQUITY = ACCOUNT_EQUITY
 # matter what the bot does. Ignoring it in paper would make paper LESS like
 # live, not more. Only TP, trailing and breakeven move to bar closes — those
 # are bot-side and have no exchange order behind them.
-MANAGE_ON_BAR_CLOSE = os.getenv("MANAGE_ON_BAR_CLOSE", "false").lower() == "true"
+MANAGE_ON_BAR_CLOSE = cfg.get("MANAGE_ON_BAR_CLOSE")
 
 # How often to refresh ACCOUNT_EQUITY from Binance (seconds)
 EQUITY_REFRESH_INTERVAL = 60   # 1 minutes
@@ -216,9 +226,9 @@ EOD_REPORT_HOUR_UTC = 0
 # t = +1.39) and the response is an inverted U — edge peaks at 4.4-4.8x and
 # FALLS at 4.8-5.0x — so a monotonic |mom|-4 score ranks the worst bucket
 # highest. Pinning CSM at 1.0 means this gate never blocks it.
-MIN_STRENGTH = float(os.getenv("MIN_STRENGTH", "0.50"))
-# Set MIN_STRENGTH=0 in .env to disable the gate entirely and let every
-# signal through, which is how the bot behaved before 2026-08-20.
+MIN_STRENGTH = cfg.get("MIN_STRENGTH")
+# MIN_STRENGTH=0 disables the gate entirely and lets every signal through,
+# which is how the bot behaved before 2026-08-20.
 
 # Tag applied to logs and notifications. With LIVE_ENABLED=false the bot still
 # tracks positions and runs SL/TP management — order_engine simulates the fill
@@ -229,7 +239,69 @@ TRADE_MODE = "LIVE" if LIVE_ENABLED else "PAPER"
 # = 1 ensures trades open sequentially — next trade only after one closes.
 # With MAX_CONCURRENT=3: cycles build up 1→2→3, then cap blocks new entries
 # until a close frees a slot.
-MAX_ENTRIES_PER_CYCLE = int(os.getenv("MAX_ENTRIES_PER_CYCLE", "2"))
+MAX_ENTRIES_PER_CYCLE = cfg.get("MAX_ENTRIES_PER_CYCLE")
+
+# Risk gates mirrored from settings so the loop reads plain globals.
+MAX_CONCURRENT       = cfg.get("MAX_CONCURRENT")
+MAX_TOTAL_MARGIN_PCT = cfg.get("MAX_TOTAL_MARGIN_PCT")
+MAX_TRADE_LOSS_PCT   = cfg.get("MAX_TRADE_LOSS_PCT")
+
+# Keys whose change must force a symbol-universe rebuild on the next cycle.
+_UNIVERSE_KEYS = ("FOCUSED_MODE", "FOCUSED_SIZE", "TOP_N_SYMBOLS", "MIN_COIN_AGE_DAYS")
+
+_settings_seen: dict = {}
+
+
+def _refresh_settings() -> set:
+    """
+    Re-snapshot the hot settings into this module's globals.
+
+    Called once per loop cycle. Returns the set of keys whose value changed
+    since the previous call, so the loop can react (e.g. rebuild the symbol
+    list when the universe shape changes). Logs every change so the journal
+    shows exactly when an operator edit took effect.
+    """
+    global SCAN_INTERVAL, FAST_INTERVAL, TOP_N_SYMBOLS, FOCUSED_MODE, _FOCUSED_N
+    global MANAGE_ON_BAR_CLOSE, FAST_LOG_EVERY, MIN_STRENGTH, MAX_ENTRIES_PER_CYCLE
+    global MAX_CONCURRENT, MAX_TOTAL_MARGIN_PCT, MAX_TRADE_LOSS_PCT
+    global CLOSE_ON_SHUTDOWN, MAX_RESUME_AGE_HOURS
+    global ACCOUNT_EQUITY, PAPER_STARTING_EQUITY
+
+    current = cfg.get_all()
+    changed = {k for k, v in current.items() if _settings_seen.get(k, v) != v}
+    _settings_seen.update(current)
+
+    for k in sorted(changed):
+        log.info(f"[SETTINGS] {k} changed -> {current[k]!r} (applied live)")
+
+    SCAN_INTERVAL         = current["SCAN_INTERVAL_SECONDS"]
+    FAST_INTERVAL         = current["FAST_INTERVAL_SECONDS"]
+    FAST_LOG_EVERY        = max(1, int(60 / max(1, FAST_INTERVAL)))
+    TOP_N_SYMBOLS         = current["TOP_N_SYMBOLS"]
+    FOCUSED_MODE          = current["FOCUSED_MODE"]
+    _FOCUSED_N            = current["FOCUSED_SIZE"]
+    MANAGE_ON_BAR_CLOSE   = current["MANAGE_ON_BAR_CLOSE"]
+    MIN_STRENGTH          = current["MIN_STRENGTH"]
+    MAX_ENTRIES_PER_CYCLE = current["MAX_ENTRIES_PER_CYCLE"]
+    MAX_CONCURRENT        = current["MAX_CONCURRENT"]
+    MAX_TOTAL_MARGIN_PCT  = current["MAX_TOTAL_MARGIN_PCT"]
+    MAX_TRADE_LOSS_PCT    = current["MAX_TRADE_LOSS_PCT"]
+    CLOSE_ON_SHUTDOWN     = current["CLOSE_ON_SHUTDOWN"]
+    MAX_RESUME_AGE_HOURS  = current["MAX_RESUME_AGE_HOURS"]
+
+    if "LOG_LEVEL" in changed:
+        logging.getLogger().setLevel(
+            getattr(logging, current["LOG_LEVEL"], logging.INFO))
+
+    # A new starting balance is a new PAPER experiment: reset the simulated
+    # ledger to it. In LIVE mode Binance is the source of truth, so the
+    # setting only matters when the balance fetch fails.
+    if "ACCOUNT_EQUITY_USDT" in changed and not LIVE_ENABLED:
+        PAPER_STARTING_EQUITY = current["ACCOUNT_EQUITY_USDT"]
+        ACCOUNT_EQUITY = paper_equity.summary(PAPER_STARTING_EQUITY)["equity"]
+        log.info(f"Paper equity reset to ${ACCOUNT_EQUITY:.2f} USDT")
+
+    return changed
 
 # Minimum regime age before scanning for new entries.
 # Prevents trading on regime flickers. Regime must be stable for this many
@@ -273,13 +345,13 @@ _POSITIONS_FILE = os.path.join(
 
 # Close all positions on SIGTERM. Default TRUE — the safe behaviour, and what
 # the bot has always done. Set false to survive restarts.
-CLOSE_ON_SHUTDOWN = os.getenv("CLOSE_ON_SHUTDOWN", "true").lower() == "true"
+CLOSE_ON_SHUTDOWN = cfg.get("CLOSE_ON_SHUTDOWN")
 
 # Refuse to resume positions older than this. A position left unmanaged for
 # hours has had no SL/TP checks from the bot; in LIVE the exchange stop still
 # protects it, but in PAPER nothing does. Resuming a very stale position is
 # usually worse than booking it.
-MAX_RESUME_AGE_HOURS = float(os.getenv("MAX_RESUME_AGE_HOURS", "12"))
+MAX_RESUME_AGE_HOURS = cfg.get("MAX_RESUME_AGE_HOURS")
 
 
 def _save_positions(live) -> None:
@@ -1179,7 +1251,8 @@ def _execute_entries(
                 new_sl = entry + ml_sl_mult * atr
             new_sl_pct = abs(entry - new_sl) / entry
             # Import thresholds from risk_engine
-            from modules.risk_engine import MIN_SL_PCT, HARD_STOP_PCT
+            from modules.risk_engine import min_sl_pct, HARD_STOP_PCT
+            MIN_SL_PCT = min_sl_pct()
             if MIN_SL_PCT <= new_sl_pct <= HARD_STOP_PCT:
                 sig["sl_price"] = new_sl
                 log.debug(
@@ -1289,15 +1362,16 @@ def main() -> None:
     log.info("=" * 60)
     log.info("  Binance USDM Futures Bot — Starting")
     log.info(f"  Scan interval : {SCAN_INTERVAL}s (full) / {FAST_INTERVAL}s (fast)")
-    log.info(f"  Account equity: ${ACCOUNT_EQUITY:,.2f} USDT (from .env)")
+    log.info(f"  Account equity: ${ACCOUNT_EQUITY:,.2f} USDT (from settings.json)")
     log.info(f"  Live trading  : {'ON ⚡' if LIVE_ENABLED else 'OFF (dry run)'}")
     if FOCUSED_MODE:
         log.info(f"  Mode          : FOCUSED — top-{_FOCUSED_N} coins only")
     else:
         log.info(f"  Max symbols   : {TOP_N_SYMBOLS}")
     log.info(f"  Max concurrent: {MAX_CONCURRENT} positions")
-    from modules.risk_engine import MAX_PER_STRATEGY
-    log.info(f"  Per-strategy caps: {MAX_PER_STRATEGY}")
+    from modules.risk_engine import max_per_strategy
+    log.info(f"  Per-strategy caps: {max_per_strategy()}")
+    log.info(f"  Settings file : {cfg.SETTINGS_FILE} (hot-reloaded)")
     log.info("=" * 60)
 
     if not validate_credentials():
@@ -1458,6 +1532,12 @@ def main() -> None:
         t_start       = time.monotonic()
         now_utc       = datetime.now(timezone.utc)
         has_open      = live.n_open() > 0
+
+        # Pick up operator edits (dashboard / Telegram / Discord) for this
+        # cycle. A change to the universe shape forces the hourly symbol
+        # refresh below to run now rather than up to an hour later.
+        if _refresh_settings() & set(_UNIVERSE_KEYS):
+            last_symbol_refresh = time.monotonic() - 3601
 
         # ── Scan / manage decoupling ──────────────────────────────────────────
         # Management and scanning run on independent clocks.

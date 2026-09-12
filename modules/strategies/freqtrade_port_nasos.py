@@ -3,21 +3,25 @@ Port of Freqtrade strategy: NASOSv4.py
 Adapted for BaseStrategy architecture using 5m resampled candles.
 """
 
-import os
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
 import math
+from modules import settings_manager as cfg
 from .base_strategy import BaseStrategy, make_exit, no_exit
 
-# Time-based exit for the freqtrade ports. 0 = OFF, which is the historical
-# behaviour: these strategies had NO time exit of any kind, so a flat position
-# could hold a slot indefinitely (observed live at 10 hours and ~0.0%). CSM has
-# had one since 2026-08-16; the ports never did, an asymmetry nobody chose.
-# Off by default so enabling it is a measured decision, not a silent change.
-PORT_MAX_HOLD_MIN = int(os.getenv("PORT_MAX_HOLD_MIN", "0"))
+# Tunables (PORT_MAX_HOLD_MIN, NASOS_SL_MODE, NASOS_SL_ATR, NASOS_SL_FLAT,
+# NASOS_TP_ATR) are read from settings_manager at call time so an edit from
+# the dashboard or a bot applies on the next scan without a restart.
+#
+# PORT_MAX_HOLD_MIN — time-based exit for the freqtrade ports. 0 = OFF, which
+# is the historical behaviour: these strategies had NO time exit of any kind,
+# so a flat position could hold a slot indefinitely (observed live at 10 hours
+# and ~0.0%). CSM has had one since 2026-08-16; the ports never did, an
+# asymmetry nobody chose. Off by default so enabling it is a measured
+# decision, not a silent change.
 
-# ── Stop construction ───────────────────────────────────────────────────────
+# ── Stop construction (NASOS_SL_MODE) ───────────────────────────────────────
 # "flat" = the ported 8%. "atr" = 6 x ATR(1m).
 #
 # REVERTED to "flat" 2026-08-30. The 6xATR default was set on a 90d/100-symbol
@@ -35,10 +39,6 @@ PORT_MAX_HOLD_MIN = int(os.getenv("PORT_MAX_HOLD_MIN", "0"))
 # Two measurement paths disagree on the same strategy, symbols and period.
 # Until that is understood, the ported original is the defensible default.
 # NASOS_SL_MODE=atr re-enables 6xATR.
-SL_MODE      = os.getenv("NASOS_SL_MODE", "flat").strip().lower()
-SL_ATR_MULT  = float(os.getenv("NASOS_SL_ATR", "6.0"))
-SL_FLAT_PCT  = float(os.getenv("NASOS_SL_FLAT", "0.08"))
-TP_ATR_MULT  = float(os.getenv("NASOS_TP_ATR", "3.0"))
 
 def EWO(df, ema_length=5, ema2_length=35):
     ema1 = ta.ema(df['close'], length=ema_length)
@@ -135,15 +135,15 @@ class NASOSv4Port(BaseStrategy):
             atr = float(ta.atr(df_1m['high'], df_1m['low'], df_1m['close'], length=14).iloc[-1])
 
             # ── Stop construction ────────────────────────────────────────────
-            # Set by SL_MODE at the top of this file. Currently "flat" (the
-            # ported 8%). The measurements for both options, and why the 6xATR
-            # default was reverted, are recorded there -- they are contested,
-            # so read them before changing this.
-            if SL_MODE == "atr" and atr > 0:
-                sl_price = entry_price - SL_ATR_MULT * atr
+            # Set by NASOS_SL_MODE (see the top of this file). Currently "flat"
+            # (the ported 8%). The measurements for both options, and why the
+            # 6xATR default was reverted, are recorded there -- they are
+            # contested, so read them before changing this.
+            if cfg.get("NASOS_SL_MODE") == "atr" and atr > 0:
+                sl_price = entry_price - cfg.get("NASOS_SL_ATR") * atr
             else:
-                sl_price = entry_price * (1 - SL_FLAT_PCT)
-            tp_price = entry_price + atr * TP_ATR_MULT
+                sl_price = entry_price * (1 - cfg.get("NASOS_SL_FLAT"))
+            tp_price = entry_price + atr * cfg.get("NASOS_TP_ATR")
 
             # Signal strength = how deep the 5m fast-RSI washout is. Entry
             # already requires rsi_fast < 35, so this maps [35 -> 0] onto
@@ -191,8 +191,9 @@ class NASOSv4Port(BaseStrategy):
 
         # Max hold: free the slot when a trade has gone nowhere. Checked BEFORE
         # the indicator work below, so it costs nothing when it fires.
-        if PORT_MAX_HOLD_MIN > 0:
-            if self.hold_minutes(position, df_1m) >= PORT_MAX_HOLD_MIN:
+        max_hold = cfg.get("PORT_MAX_HOLD_MIN")
+        if max_hold > 0:
+            if self.hold_minutes(position, df_1m) >= max_hold:
                 return make_exit(float(df_1m["close"].iloc[-1]), "MAX_HOLD")
 
         df_5m = df_1m.resample('5min', on='timestamp').agg({

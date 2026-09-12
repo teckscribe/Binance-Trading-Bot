@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "dashboard",
-      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeExecutable": "venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "uvicorn", "web_server:app", "--host", "127.0.0.1", "--port", "8107"],
       "port": 8107
     }

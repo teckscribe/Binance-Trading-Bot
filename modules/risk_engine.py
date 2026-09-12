@@ -28,6 +28,8 @@ Maintenance margin rate for Binance: ~0.5% on most contracts.
 import logging
 import os
 
+from modules import settings_manager as cfg
+
 log = logging.getLogger("RiskEngine")
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -36,20 +38,34 @@ MAX_LEVERAGE        = 50         # Hard cap at 50× (increased to support dynami
                                  # At $10 × 20% margin × 5× = $10 notional (above Binance $5 min)
                                  # Raising above 5× risks liquidation < 20% from entry
 MAINTENANCE_MARGIN  = 0.005      # 0.5% — Binance standard for major perps
-MAX_CONCURRENT      = int(os.getenv("MAX_CONCURRENT", "3"))
+
+# ─── Runtime-editable limits ──────────────────────────────────────────────────
+# Every tunable below is a FUNCTION, not a constant, so a change made from the
+# dashboard or a bot applies on the next call with no restart. Bounds are
+# enforced by settings_manager.SPEC, so no clamping is needed here.
+
+def max_concurrent() -> int:
+    return cfg.get("MAX_CONCURRENT")
+
 
 # ─── Loss caps ────────────────────────────────────────────────────────────────
 # Three layers of loss protection — each independently blocks new entries.
 # Open positions always run to their own SL — never panic-closed by loss caps.
 # All caps persist to disk so they survive bot restarts.
 
-DAILY_LOSS_CAP     = max(-0.50, min(-0.01, float(os.getenv("DAILY_LOSS_CAP", "-0.10"))))    # −10% daily → no new entries until next UTC day
-WEEKLY_LOSS_CAP    = max(-0.50, min(-0.01, float(os.getenv("WEEKLY_LOSS_CAP", "-0.15"))))   # −15% weekly → no new entries until next UTC Monday
-SESSION_LOSS_FLOOR = max(-0.50, min(-0.01, float(os.getenv("SESSION_LOSS_FLOOR", "-0.10")))) # −10% session floor
-                              # Matched to daily cap: on micro accounts the old -3%
-                              # floor killed sessions after 3 losses, before the daily
-                              # cap could kick in. -5% = daily cap = no premature halt.
-                              # boundary persisted to disk.
+def daily_loss_cap() -> float:       # −10% daily → no new entries until next UTC day
+    return cfg.get("DAILY_LOSS_CAP")
+
+
+def weekly_loss_cap() -> float:      # −15% weekly → no new entries until next UTC Monday
+    return cfg.get("WEEKLY_LOSS_CAP")
+
+
+def session_loss_floor() -> float:
+    # Matched to daily cap: on micro accounts the old -3% floor killed sessions
+    # after 3 losses, before the daily cap could kick in.
+    return cfg.get("SESSION_LOSS_FLOOR")
+
 
 # Margin cap — max % of equity to commit as isolated margin on one trade.
 # Aggregate margin cap across ALL open positions. MAX_MARGIN_PCT below is
@@ -57,9 +73,9 @@ SESSION_LOSS_FLOOR = max(-0.50, min(-0.01, float(os.getenv("SESSION_LOSS_FLOOR",
 # being committed at once — observed live at 86% when CSM sized three
 # tight-stop majors at $27-30 margin each. This is the ceiling on total
 # simultaneous exposure.
-MAX_TOTAL_MARGIN_PCT = max(
-    0.05, min(1.0, float(os.getenv("MAX_TOTAL_MARGIN_PCT", "0.60")))
-)
+def max_total_margin_pct() -> float:
+    return cfg.get("MAX_TOTAL_MARGIN_PCT")
+
 
 MAX_MARGIN_PCT      = 0.30       # Per-trade margin cap (was 0.20). Raised so 2× lev
                                  #  positions fit on $10 equity. With 2× lev and $5
@@ -82,9 +98,8 @@ MAX_MARGIN_PCT      = 0.30       # Per-trade margin cap (was 0.20). Raised so 2�
 #   cap 0.50           -> 5x needs SL <= 10.0%  — effectively uncapped at 5x
 #
 # Raising it means a stop-out costs proportionally more of the margin posted.
-MAX_LEVERAGED_LOSS_PCT = max(
-    0.01, min(1.0, float(os.getenv("MAX_LEVERAGED_LOSS_PCT", "0.10")))
-)
+def max_leveraged_loss_pct() -> float:
+    return cfg.get("MAX_LEVERAGED_LOSS_PCT")
 
 # Minimum SL distance — reject signals where SL is unrealistically tight.
 #
@@ -97,7 +112,8 @@ MAX_LEVERAGED_LOSS_PCT = max(
 #      equity — 1.4x account, $29.66 margin, three of them = 86% committed.
 # Rejecting them here keeps CSM on the higher-ATR alts its measured edge came
 # from, and stops tiny stops ballooning position size.
-MIN_SL_PCT = max(0.001, float(os.getenv("MIN_SL_PCT", "0.015")))
+def min_sl_pct() -> float:
+    return cfg.get("MIN_SL_PCT")
 
 # Maximum SL distance — reject signals whose stop is further than this from
 # entry. This is the per-trade loss ceiling, and it applies to EVERY strategy.
@@ -150,7 +166,8 @@ MIN_SL_PCT = max(0.001, float(os.getenv("MIN_SL_PCT", "0.015")))
 # 0.10 caps the genuine tail (~12% of live trades sat above an 8% stop) while
 # leaving the ATR-sized stops that carry the edge. To bound ACCOUNT loss, lower
 # RISK_PCT_PER_TRADE instead — that is the knob that actually controls it.
-MAX_SL_PCT = max(MIN_SL_PCT, float(os.getenv("MAX_SL_PCT", "0.10")))
+def max_sl_pct() -> float:
+    return max(min_sl_pct(), cfg.get("MAX_SL_PCT"))
 
 # ── Hard per-trade loss ceiling, enforced on EXIT ────────────────────────────
 # Close any open position whose LEVERAGED loss reaches this, regardless of what
@@ -179,16 +196,15 @@ MAX_SL_PCT = max(MIN_SL_PCT, float(os.getenv("MAX_SL_PCT", "0.10")))
 # It also fires BEFORE the strategy's stop in most configurations, which means
 # the strategy's own exit logic — breakeven, trailing, the CSM profit ladder —
 # never gets to run on losing trades.
-MAX_TRADE_LOSS_PCT = max(0.0, float(os.getenv("MAX_TRADE_LOSS_PCT", "0")))
+def max_trade_loss_pct() -> float:
+    return cfg.get("MAX_TRADE_LOSS_PCT")
+
 
 # Maximum SL distance used by ML P3 SL-override validation in live_scanner.py.
 # ML override is rejected if the resulting sl_pct exceeds this value — ensures
 # the ML-suggested SL doesn't widen beyond the widest per-strategy hard stop
 # (TP=2.5%, DB=2.5%). Imported as: from modules.risk_engine import HARD_STOP_PCT
 HARD_STOP_PCT       = 0.025      # 2.5% — upper bound for ML P3 SL override
-
-# Backward compat alias — used in live_scanner.py imports
-DAILY_LOSS_FLOOR = DAILY_LOSS_CAP
 
 # Per-strategy leverage — targeted caps on worst-case leveraged loss.
 # TP cut 5→2 (was 12.8% leveraged HARD_STOPs). DB cut 5→3 (was 15%).
@@ -221,66 +237,20 @@ MIN_NOTIONAL_USDT = 5.0          # Binance minimum order size in USDT
 
 # ─── Leverage ─────────────────────────────────────────────────────────────────
 
-# GLOBAL_LEVERAGE is edited at runtime by the Telegram/Discord bots, which
-# rewrite the .env file on disk. os.environ is only populated by load_dotenv()
-# at startup, so reading the env alone would need a scanner restart to see the
-# change. Re-read the file instead, cached on mtime so this stays cheap when
-# called per-signal. Falls back to os.environ if the file is unreadable.
-_ENV_FILE       = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-_env_lev_cache  = {"mtime": None, "value": None}
-
-
-def _global_leverage_override():
-    """Read GLOBAL_LEVERAGE from .env, re-reading only when the file changes."""
-    try:
-        mtime = os.path.getmtime(_ENV_FILE)
-    except OSError:
-        return os.getenv("GLOBAL_LEVERAGE")
-
-    if _env_lev_cache["mtime"] != mtime:
-        value = None
-        try:
-            with open(_ENV_FILE, encoding="utf-8", errors="replace") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("GLOBAL_LEVERAGE=") and not line.startswith("#"):
-                        value = line.split("=", 1)[1].strip().strip("'\"")
-        except Exception as exc:
-            # Was `except OSError`, which does NOT catch UnicodeDecodeError.
-            # .env carries non-ASCII in its comments, and on Windows the default
-            # cp1252 decode raised here — inside get_leverage(), which
-            # compute_position_size() calls on EVERY entry. One emoji in a
-            # comment would have crashed every signal.
-            log.warning(f"Could not read GLOBAL_LEVERAGE from .env: {exc}")
-            return os.getenv("GLOBAL_LEVERAGE")
-        _env_lev_cache.update(mtime=mtime, value=value)
-
-    # File value wins when present, so bot edits apply without a restart.
-    # Otherwise fall back to the process env, so a systemd Environment= or a
-    # shell export still works when .env carries no GLOBAL_LEVERAGE line.
-    return _env_lev_cache["value"] or os.getenv("GLOBAL_LEVERAGE")
-
-
 def get_leverage(strategy_id: str) -> int:
     """
     Return the configured leverage for a given strategy.
-    If GLOBAL_LEVERAGE is set in .env, it overrides all strategies.
+    GLOBAL_LEVERAGE > 0 overrides all strategies; 0 uses the table above.
 
-    Picked up live — editing .env (e.g. via the Telegram/Discord /leverage
-    command) applies from the next signal onward, with no restart needed.
-
-    Args:
-        strategy_id : 'TP' | 'FF' | 'DB' | 'GRID' | 'BBR'
+    Picked up live — a change via the dashboard or the Telegram/Discord
+    /leverage command applies from the next signal onward, no restart needed.
 
     Returns:
         Integer leverage, capped at MAX_LEVERAGE.
     """
-    global_lev_str = _global_leverage_override()
-    if global_lev_str:
-        try:
-            return max(1, min(int(global_lev_str), MAX_LEVERAGE))
-        except ValueError:
-            pass
+    global_lev = cfg.get("GLOBAL_LEVERAGE")
+    if global_lev > 0:
+        return max(1, min(global_lev, MAX_LEVERAGE))
 
     lev = STRATEGY_LEVERAGE.get(strategy_id, 3)
     return min(lev, MAX_LEVERAGE)
@@ -328,6 +298,9 @@ def compute_position_size(
         return _invalid_size("Zero SL distance or zero entry price")
 
     sl_pct = sl_distance / entry_price
+    MIN_SL_PCT = min_sl_pct()
+    MAX_SL_PCT = max_sl_pct()
+    MAX_LEVERAGED_LOSS_PCT = max_leveraged_loss_pct()
 
     # ── Minimum SL distance check ─────────────────────────────────────────────
     # SL tighter than 0.5% is noise — price will hit it on normal spread/wick
@@ -602,6 +575,7 @@ def record_trade_pnl(pnl_pct: float) -> dict:
     data["week_pnl"] = round(data.get("week_pnl", 0.0) + pnl_pct, 6)
     _save_tracker(data)
 
+    DAILY_LOSS_CAP, WEEKLY_LOSS_CAP = daily_loss_cap(), weekly_loss_cap()
     daily_hit  = data["day_pnl"]  <= DAILY_LOSS_CAP
     weekly_hit = data["week_pnl"] <= WEEKLY_LOSS_CAP
 
@@ -648,6 +622,7 @@ def is_loss_cap_hit() -> tuple[bool, str]:
     day_pnl  = data.get("day_pnl",  0.0) if data.get("day")  == _utc_today() else 0.0
     week_pnl = data.get("week_pnl", 0.0) if data.get("week") == _utc_week()  else 0.0
 
+    DAILY_LOSS_CAP, WEEKLY_LOSS_CAP = daily_loss_cap(), weekly_loss_cap()
     if week_pnl <= WEEKLY_LOSS_CAP:
         return True, (
             f"Weekly loss cap active: {week_pnl*100:.2f}% "
@@ -669,8 +644,8 @@ def get_loss_status() -> dict:
     return {
         "day_pnl":   round(data.get("day_pnl",  0.0) * 100, 3),
         "week_pnl":  round(data.get("week_pnl", 0.0) * 100, 3),
-        "daily_cap": DAILY_LOSS_CAP  * 100,
-        "weekly_cap": WEEKLY_LOSS_CAP * 100,
+        "daily_cap": daily_loss_cap()  * 100,
+        "weekly_cap": weekly_loss_cap() * 100,
     }
 
 
@@ -679,34 +654,24 @@ def get_loss_status() -> dict:
 def is_daily_floor_hit(session_pnl_pct: float) -> bool:
     """
     Session-level floor check (in-memory, resets on restart).
-    Uses SESSION_LOSS_FLOOR (-5%) — distinct from the persistent daily cap.
+    Uses SESSION_LOSS_FLOOR — distinct from the persistent daily cap.
     """
-    return session_pnl_pct <= SESSION_LOSS_FLOOR
+    return session_pnl_pct <= session_loss_floor()
 
 
-def _parse_per_strategy(raw: str) -> dict:
-    result = {}
-    for pair in raw.split(","):
-        pair = pair.strip()
-        if ":" not in pair:
-            continue
-        k, v = pair.split(":", 1)
-        result[k.strip()] = int(v.strip())
-    return result
-
-MAX_PER_STRATEGY = _parse_per_strategy(
-    os.getenv("MAX_PER_STRATEGY", "CSM:3,NASOS_V4:3,ELLIOT_V8:3")
-)
+def max_per_strategy() -> dict:
+    """{strategy_id: cap} from MAX_PER_STRATEGY, current as of this call."""
+    return cfg.parse_caps(cfg.get("MAX_PER_STRATEGY"))
 
 
 def is_position_cap_hit(n_open: int) -> bool:
     """Return True if maximum concurrent positions are already open."""
-    return n_open >= MAX_CONCURRENT
+    return n_open >= max_concurrent()
 
 
 def is_strategy_cap_hit(strategy_id: str, active_positions: list) -> bool:
     """Return True if this strategy has reached its per-strategy slot limit."""
-    cap = MAX_PER_STRATEGY.get(strategy_id)
+    cap = max_per_strategy().get(strategy_id)
     if cap is None:
         return False
     count = sum(1 for p in active_positions if p.get("strategy") == strategy_id)

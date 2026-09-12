@@ -42,6 +42,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from modules import settings_manager as cfg
+cfg.migrate_from_env()
+
 BOT_TOKEN  = os.getenv("DISCORD_BOT_TOKEN", "")
 GUILD_ID   = int(os.getenv("DISCORD_GUILD_ID", "0"))
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
@@ -65,7 +68,6 @@ STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "ELLIOT_V8": "🟣"}
 SERVICE    = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
-ENV_FILE  = os.path.join(_BOT_DIR, ".env")
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -74,41 +76,26 @@ logging.basicConfig(
 log = logging.getLogger("DiscordBot")
 
 
-# ─── .env read/write ──────────────────────────────────────────────────────────
+# ─── Settings access ──────────────────────────────────────────────────────────
+# Tunables live in data/settings.json (modules/settings_manager.py) and the
+# scanner re-reads them every cycle, so edits below apply without a restart.
+# Only LIVE_ENABLED is still a .env value — flipping it restarts the scanner.
 
-def _read_env_value(key: str) -> str:
-    try:
-        with open(ENV_FILE, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith(f"{key}="):
-                    return line.split("=", 1)[1].strip()
-    except Exception:
-        pass
-    return ""
+def _setting(key: str) -> str:
+    return cfg.get_str(key)
 
 
-def _write_env_value(key: str, value: str) -> bool:
-    try:
-        with open(ENV_FILE, encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-        found = False
-        new_lines = []
-        for line in lines:
-            if line.strip().startswith(f"{key}="):
-                new_lines.append(f"{key}={value}\n")
-                found = True
-            else:
-                new_lines.append(line)
-        if not found:
-            new_lines.append(f"{key}={value}\n")
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        log.info(f".env updated: {key}={value}")
-        return True
-    except Exception as exc:
-        log.error(f".env write failed: {exc}")
-        return False
+def _set_setting(key: str, value) -> tuple:
+    ok, err = cfg.set_value(key, value)
+    if ok:
+        log.info(f"settings.json updated: {key}={value}")
+    else:
+        log.error(f"settings.json update refused: {err}")
+    return ok, err
+
+
+def _live_enabled() -> bool:
+    return cfg.env_get("LIVE_ENABLED", "false").lower() == "true"
 
 
 # ─── Systemctl helpers ────────────────────────────────────────────────────────
@@ -143,17 +130,14 @@ def _service_status() -> str:
 
 
 def _capital_status() -> str:
-    val = _read_env_value("ACCOUNT_EQUITY_USDT")
-    return val if val else "not set"
+    return _setting("ACCOUNT_EQUITY_USDT")
 
 def _max_concurrent_status() -> str:
-    val = _read_env_value("MAX_CONCURRENT")
-    return val if val else "3 (default)"
+    return _setting("MAX_CONCURRENT")
 
 
 def _max_per_strategy_status() -> str:
-    val = _read_env_value("MAX_PER_STRATEGY")
-    return val if val else "not set (unlimited per strategy)"
+    return _setting("MAX_PER_STRATEGY")
 
 
 def _known_strategy_ids() -> list:
@@ -200,10 +184,7 @@ def validate_max_per_strategy(text: str):
 
     value = ",".join(f"{s}:{n}" for s, n in pairs)
     warn = []
-    try:
-        mc = int(_read_env_value("MAX_CONCURRENT") or 3)
-    except ValueError:
-        mc = 3
+    mc = cfg.get("MAX_CONCURRENT")
     over = [f"{s}:{n}" for s, n in pairs if n > mc]
     if over:
         warn.append(f"⚠️ {', '.join(over)} exceed MAX_CONCURRENT={mc} — those caps can never bind.")
@@ -218,8 +199,8 @@ def validate_max_per_strategy(text: str):
 
 
 def _leverage_status() -> str:
-    val = _read_env_value("GLOBAL_LEVERAGE")
-    return val if val else "Auto"
+    val = cfg.get("GLOBAL_LEVERAGE")
+    return str(val) if val > 0 else "Auto"
 
 
 # ─── Loss status ──────────────────────────────────────────────────────────────
@@ -878,7 +859,7 @@ class BotControlsView(discord.ui.View):
         except Exception:
             pass
         cap_str = f"${live_bal:.4f}" if live_bal is not None else f"${_capital_status()}"
-        mode = "LIVE" if _read_env_value("LIVE_ENABLED").lower() == "true" else "PAPER"
+        mode = "LIVE" if _live_enabled() else "PAPER"
         text = (
             f"📊 **Bot Status**\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
@@ -901,7 +882,7 @@ class TradeControlsView(discord.ui.View):
     @discord.ui.button(label="🔀 Trade Mode", style=discord.ButtonStyle.danger, row=0)
     async def mode_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        cur_live = _read_env_value("LIVE_ENABLED").lower() == "true"
+        cur_live = _live_enabled()
         cur, nxt = ("LIVE", "PAPER") if cur_live else ("PAPER", "LIVE")
         warn = ("\n\n⚠️ **LIVE places REAL orders on Binance with real money.**"
                 if nxt == "LIVE" else
@@ -1137,10 +1118,10 @@ class TradeModeConfirmView(discord.ui.View):
     @discord.ui.button(label="✅ Confirm", style=discord.ButtonStyle.success)
     async def confirm_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        cur_live = _read_env_value("LIVE_ENABLED").lower() == "true"
+        cur_live = _live_enabled()
         nxt   = "false" if cur_live else "true"
         label = "PAPER" if cur_live else "LIVE"
-        if not _write_env_value("LIVE_ENABLED", nxt):
+        if not cfg.env_set("LIVE_ENABLED", nxt):
             await interaction.followup.send(
                 "❌ Could not write .env — mode unchanged.", view=TradeControlsView())
             return
@@ -1455,14 +1436,15 @@ async def cmd_max_concurrent(interaction: discord.Interaction, count: int = None
         return
 
     old = _max_concurrent_status()
-    if not _write_env_value("MAX_CONCURRENT", str(count)):
-        await interaction.followup.send("❌ Failed to write .env — check permissions.")
+    ok, err = _set_setting("MAX_CONCURRENT", count)
+    if not ok:
+        await interaction.followup.send(f"❌ Could not save: {err}")
         return
 
     # Per-strategy caps that were sensible at the old slot count may now be
     # inert or leave slots unfillable, so re-check them against the new value.
     note = ""
-    caps = _read_env_value("MAX_PER_STRATEGY")
+    caps = _setting("MAX_PER_STRATEGY")
     if caps:
         _ok, _v, warn = validate_max_per_strategy(caps)
         if warn:
@@ -1471,7 +1453,7 @@ async def cmd_max_concurrent(interaction: discord.Interaction, count: int = None
     await interaction.followup.send(
         f"✅ **Max Concurrent updated**\n"
         f"  Old : ~~{old}~~\n  New : **{count}**\n\n"
-        f"🔄 **Restart the scanner** — this is read once at startup.{note}")
+        f"✨ Applies on the scanner's next cycle — no restart needed.{note}")
     log.info(f"MAX_CONCURRENT changed via Discord: {old} -> {count}")
 
 
@@ -1498,14 +1480,15 @@ async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = Non
         return
 
     old = _max_per_strategy_status()
-    if not _write_env_value("MAX_PER_STRATEGY", value):
-        await interaction.followup.send("❌ Failed to write .env — check permissions.")
+    ok, err = _set_setting("MAX_PER_STRATEGY", value)
+    if not ok:
+        await interaction.followup.send(f"❌ Could not save: {err}")
         return
 
     await interaction.followup.send(
         f"✅ **Per-Strategy Caps updated**\n"
         f"  Old : `{old}`\n  New : `{value}`\n\n"
-        f"🔄 **Restart the scanner** for this to take effect."
+        f"✨ Applies on the scanner's next cycle — no restart needed."
         + (f"\n\n{msg}" if msg else ""))
     log.info(f"MAX_PER_STRATEGY changed via Discord: {old} -> {value}")
 
@@ -1772,18 +1755,20 @@ async def cmd_capital(interaction: discord.Interaction, amount: float = None):
         return
 
     old = _capital_status()
-    ok  = _write_env_value("ACCOUNT_EQUITY_USDT", f"{amount:.2f}")
+    ok, err = _set_setting("ACCOUNT_EQUITY_USDT", f"{amount:.2f}")
     if ok:
         await interaction.followup.send(
             f"✅ **Capital updated**\n\n"
             f"Old : ~~${old}~~ USDT\n"
             f"New : **${amount:,.2f}** USDT\n\n"
-            f"⚠️ **Restart the scanner** to apply.",
+            f"✨ Applies on the scanner's next cycle — no restart needed.\n"
+            f"*In PAPER mode this resets the simulated ledger to the new "
+            f"starting balance.*",
             view=MainMenuView(),
         )
         log.info(f"Capital changed via Discord: {old} → {amount:.2f}")
     else:
-        await interaction.followup.send("❌ Failed to write .env file.")
+        await interaction.followup.send(f"❌ Could not save: {err}")
 
 @tree.command(name="leverage", description="View or change global leverage", guild=GUILD_OBJ)
 @app_commands.describe(amount="New leverage multiplier (omit to view current)")
@@ -1805,7 +1790,7 @@ async def cmd_leverage(interaction: discord.Interaction, amount: int = None):
         return
 
     old = _leverage_status()
-    ok  = _write_env_value("GLOBAL_LEVERAGE", f"{amount}")
+    ok, err = _set_setting("GLOBAL_LEVERAGE", amount)
     if ok:
         await interaction.followup.send(
             f"✅ **Global Leverage updated**\n\n"
@@ -1818,7 +1803,7 @@ async def cmd_leverage(interaction: discord.Interaction, amount: int = None):
         )
         log.info(f"Leverage changed via Discord: {old}x → {amount}x")
     else:
-        await interaction.followup.send("❌ Failed to write .env file.")
+        await interaction.followup.send(f"❌ Could not save: {err}")
 
 
 @tree.command(name="strategies", description="Toggle strategies on/off", guild=GUILD_OBJ)

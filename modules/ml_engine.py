@@ -47,6 +47,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from modules import settings_manager as cfg
+
 log = logging.getLogger("MLEngine")
 
 # -"-"-"- Paths -"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-
@@ -58,8 +60,14 @@ _MODEL_PATH    = _ML_DIR / "model.pkl"
 _MILESTONES_PATH = _ML_DIR / "milestones_notified.json"
 
 # -"-"-"- Phase gating -"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-"-
-ML_PHASE  = int(os.getenv("ML_PHASE", "1"))
-ML_SHADOW = os.getenv("ML_SHADOW", "true").lower() == "true"
+# Read per call so a dashboard/bot change applies without a restart.
+def _phase() -> int:
+    return cfg.get("ML_PHASE")
+
+
+def _shadow() -> bool:
+    return cfg.get("ML_SHADOW")
+
 
 MIN_TRADES_PHASE2 = 50
 MIN_TRADES_PHASE3 = 100
@@ -501,7 +509,7 @@ def _score_signal(signal: dict, features: dict) -> float:
       Linear interpolation between.
     Falls back to strategy-wide stats if bucket has < 5 trades.
     """
-    if ML_PHASE < 2:
+    if _phase() < 2:
         return 1.0
     if _completed_count() < MIN_TRADES_PHASE2:
         return 1.0
@@ -578,7 +586,7 @@ def _get_optimal_params(signal: dict, features: dict) -> dict:
       Trail = based on median winner duration (short -> tight trail).
     Returns empty dict if Phase 3 not active or insufficient data.
     """
-    if ML_PHASE < 3:
+    if _phase() < 3:
         return {}
     if _completed_count() < MIN_TRADES_PHASE3:
         return {}
@@ -777,7 +785,7 @@ def _predict_and_gate(signal: dict, features: dict) -> dict:
     """
     result = {"win_prob": -1.0, "gate_action": "PASS", "gate_shadow": True}
 
-    if ML_PHASE < 4:
+    if _phase() < 4:
         return result
     if _completed_count() < MIN_TRADES_PHASE4:
         return result
@@ -806,10 +814,11 @@ def _predict_and_gate(signal: dict, features: dict) -> dict:
 
     passes    = prob >= CONFIDENCE_THRESHOLD
     action    = "PASS" if passes else "SKIP"
-    effective = "PASS" if ML_SHADOW else action
+    shadow    = _shadow()
+    effective = "PASS" if shadow else action
 
     emoji = "\u2705" if passes else "\u274c"
-    tag   = "[SHADOW]" if ML_SHADOW else "[GATE]"
+    tag   = "[SHADOW]" if shadow else "[GATE]"
     log.info(
         f"{tag} {emoji} {signal.get('strategy')} {signal.get('symbol')} "
         f"P(win)={prob:.3f} -> {effective}"
@@ -818,7 +827,7 @@ def _predict_and_gate(signal: dict, features: dict) -> dict:
     return {
         "win_prob":    round(prob, 4),
         "gate_action": effective,
-        "gate_shadow": ML_SHADOW,
+        "gate_shadow": shadow,
     }
 
 
@@ -886,12 +895,12 @@ def get_ml_status() -> dict:
             break
 
     return {
-        "ml_phase":         ML_PHASE,
+        "ml_phase":         _phase(),
         "completed_trades": n,
         "next_milestone":   next_milestone,
         "next_phase_name":  next_name,
         "phases_ready":     phases_ready,
-        "shadow_mode":      ML_SHADOW,
+        "shadow_mode":      _shadow(),
     }
 
 
@@ -911,7 +920,7 @@ def check_milestone_alert() -> str | None:
                 f"\U0001f916 ML Milestone reached!\n"
                 f"\U0001f4ca {n} trades logged\n"
                 f"\U0001f513 {name} is now ready\n\n"
-                f"To enable: set ML_PHASE={phase_num} in .env and restart"
+                f"To enable: set ML phase to {phase_num} in the dashboard Settings tab"
             )
     return None
 

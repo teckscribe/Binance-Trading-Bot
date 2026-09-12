@@ -61,43 +61,25 @@ CSM_SL_ATR_SHORT=3.0 CSM_TP_ATR_SHORT=6.0 CSM_MAX_HOLD_MIN=480, plus the old
 ladder rungs, which are no longer in the file.
 """
 
-import os
 import pandas as pd
+from modules import settings_manager as cfg
 from modules.strategies.base_strategy import BaseStrategy
 
-
-def _f(key, default):
-    try: return float(os.getenv(key, str(default)))
-    except ValueError: return default
-
-
-def _b(key, default):
-    return os.getenv(key, str(default)).strip().lower() in ("1", "true", "yes", "on")
-
-
-# ── Entry band (|normalised 24h momentum|, in ATR(1h) units) ────────────────
-MOM_LO      = _f("CSM_MOM_LO", 3.0)
-MOM_HI      = _f("CSM_MOM_HI", 4.0)
-
-# ── Direction ───────────────────────────────────────────────────────────────
-ALLOW_LONG  = _b("CSM_ALLOW_LONG",  True)
-ALLOW_SHORT = _b("CSM_ALLOW_SHORT", True)
-
-# ── Stops / targets ─────────────────────────────────────────────────────────
-SL_ATR_MULT       = _f("CSM_SL_ATR_LONG",  2.0)
-TP_ATR_MULT       = _f("CSM_TP_ATR_LONG",  4.0)
-SL_ATR_MULT_SHORT = _f("CSM_SL_ATR_SHORT", 2.0)
-TP_ATR_MULT_SHORT = _f("CSM_TP_ATR_SHORT", 4.0)
-
-MIN_SL_PCT = _f("CSM_MIN_SL_PCT", 0.02)
-
-# 480 -> 1440. Shorter holds cut the winners that pay for a 54% loss rate;
-# median hold is 6.4h but the right tail runs much longer.
-# NOTE: a CSM_MAX_HOLD_MIN line in .env OVERRIDES this default.
-MAX_HOLD_MIN = int(_f("CSM_MAX_HOLD_MIN", 1440))
+# All CSM_* tunables are read from settings_manager at CALL time (see the top
+# of scan() / _build_signal() / manage()), so a dashboard or bot edit applies
+# on the next scan without a restart. Defaults and bounds live in
+# settings_manager.SPEC:
+#   CSM_MOM_LO / CSM_MOM_HI        entry band, |24h move| in ATR(1h) units
+#   CSM_ALLOW_LONG / _SHORT        direction
+#   CSM_SL_ATR_* / CSM_TP_ATR_*    stops / targets in ATR(15m) units
+#   CSM_MIN_SL_PCT                 floor on the ATR-derived stop
+#   CSM_MAX_HOLD_MIN               480 -> 1440: shorter holds cut the winners
+#                                  that pay for a 54% loss rate
+#   CSM_VOL_RATIO_MIN              last completed 1h volume vs 24h average
+#   CSM_PROFIT_LADDER / CSM_LEGACY_BE   stop management, see manage()
 
 # ── Profit ladder — ON for Hybrid Model ────────────────────────────────────
-PROFIT_LADDER = [] if os.getenv("CSM_PROFIT_LADDER", "on").lower() == "off" else [
+_LADDER_RUNGS = [
     (0.010, 0.0015),      # Stage 1: +1.0% gain -> lock +0.15% (Risk-free Breakeven + fees)
     (0.025, 0.0150),      # Stage 2: +2.5% gain -> lock +1.50% profit
     (0.040, 0.0250),      # Stage 3: +4.0% gain -> lock +2.50% profit
@@ -108,14 +90,6 @@ TRAIL_ATR_MULT = 2.0
 # because a >=2.0% excursion is a genuine move whose retrace should be locked,
 # whereas stage 1 (1.0%) sits inside entry noise and needs bar-close stability.
 LADDER_HWM_TRIGGER_THRESHOLD = 0.020
-
-# ── Volume expansion filter ──────────────────────────────────────────────────
-# Requires current 1h breakout volume to be >= VOL_RATIO_MIN x 24h average
-# hourly volume, filtering out low-liquidity fake-outs on illiquid alts.
-VOL_RATIO_MIN = _f("CSM_VOL_RATIO_MIN", 1.0)
-
-# ── Stop management when the ladder is empty ────────────────────────────────
-LEGACY_BREAKEVEN = _b("CSM_LEGACY_BE", False)
 
 # Breakeven trigger used ONLY by the legacy path (CSM_PROFIT_LADDER=off).
 # ATR-scaled via BaseStrategy.breakeven_trigger(), floored at this percentage.
@@ -131,6 +105,10 @@ class CrossSectionalMomentum(BaseStrategy):
     def scan(self, symbol: str, df_1m: pd.DataFrame, df_15m: pd.DataFrame, df_1h: pd.DataFrame, regime: dict) -> dict:
         if df_1h is None or len(df_1h) < 25 or df_15m is None or len(df_15m) < 20:
             return None
+
+        MOM_LO, MOM_HI = cfg.get("CSM_MOM_LO"), cfg.get("CSM_MOM_HI")
+        ALLOW_LONG, ALLOW_SHORT = cfg.get("CSM_ALLOW_LONG"), cfg.get("CSM_ALLOW_SHORT")
+        VOL_RATIO_MIN = cfg.get("CSM_VOL_RATIO_MIN")
 
         c1h = df_1h['close'].astype(float)
 
@@ -194,6 +172,10 @@ class CrossSectionalMomentum(BaseStrategy):
         tr_15 = pd.concat([tr1_15, tr2_15, tr3_15], axis=1).max(axis=1)
         atr_15 = float(tr_15.rolling(14).mean().iloc[-1])
 
+        MIN_SL_PCT = cfg.get("CSM_MIN_SL_PCT")
+        SL_ATR_MULT, SL_ATR_MULT_SHORT = cfg.get("CSM_SL_ATR_LONG"), cfg.get("CSM_SL_ATR_SHORT")
+        TP_ATR_MULT, TP_ATR_MULT_SHORT = cfg.get("CSM_TP_ATR_LONG"), cfg.get("CSM_TP_ATR_SHORT")
+
         min_sl_dist = entry_price * MIN_SL_PCT
         sl_mult = SL_ATR_MULT if direction == "LONG" else SL_ATR_MULT_SHORT
         raw_sl_dist = atr_15 * sl_mult
@@ -241,6 +223,10 @@ class CrossSectionalMomentum(BaseStrategy):
         current_price = float(df['close'].iloc[-1])
         entry_price = float(position['entry_price'])
         direction = position.get("direction", "LONG")
+
+        MAX_HOLD_MIN = cfg.get("CSM_MAX_HOLD_MIN")
+        PROFIT_LADDER = _LADDER_RUNGS if cfg.get("CSM_PROFIT_LADDER") == "on" else []
+        LEGACY_BREAKEVEN = cfg.get("CSM_LEGACY_BE")
 
         # --- Max hold time: close flat trades after MAX_HOLD_MIN to free slots ---
         #

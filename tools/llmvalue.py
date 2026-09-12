@@ -11,7 +11,9 @@ from collections import defaultdict
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # relocation-proof; was a hardcoded absolute path
 sys.path.insert(0, PROJECT); os.chdir(PROJECT)
 import pandas as pd, numpy as np, backtest_optimizer as bt
-from modules.risk_engine import compute_position_size, MAX_TOTAL_MARGIN_PCT, MAX_CONCURRENT
+from modules.risk_engine import compute_position_size, max_total_margin_pct, max_concurrent
+MAX_TOTAL_MARGIN_PCT = max_total_margin_pct()
+MAX_CONCURRENT = max_concurrent()
 logging.disable(logging.WARNING)
 
 syms = sorted(os.path.basename(p).split("_15m_")[0] for p in glob.glob("data/*_15m_90d.csv"))

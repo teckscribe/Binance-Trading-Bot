@@ -186,26 +186,15 @@ def test_binance_connection() -> dict:
         )
 
     # ── 5. ACCOUNT_EQUITY_USDT ────────────────────────────────────────────────
-    raw_equity = os.getenv("ACCOUNT_EQUITY_USDT", "")
-    info["configured_equity"] = raw_equity
-    if not raw_equity:
+    from modules import settings_manager as cfg
+    equity = cfg.get("ACCOUNT_EQUITY_USDT")
+    info["configured_equity"] = equity
+    if equity > 1000 and info.get("balance_usdt", 0) < equity * 0.5:
         issues.append(
-            "ACCOUNT_EQUITY_USDT is not set in .env — bot will use $10 default. "
-            "Set it explicitly: ACCOUNT_EQUITY_USDT=10"
+            f"ACCOUNT_EQUITY_USDT={equity} looks wrong "
+            f"(actual balance ≈ {info.get('balance_usdt', '?')} USDT) — "
+            f"correct it in the dashboard Settings tab"
         )
-    else:
-        try:
-            equity = float(raw_equity)
-            if equity <= 0:
-                issues.append(f"ACCOUNT_EQUITY_USDT={raw_equity} is invalid (must be > 0)")
-            elif equity > 1000 and info.get("balance_usdt", 0) < equity * 0.5:
-                issues.append(
-                    f"ACCOUNT_EQUITY_USDT={equity} looks wrong "
-                    f"(actual balance ≈ {info.get('balance_usdt', '?')} USDT) — "
-                    f"correct it in .env"
-                )
-        except ValueError:
-            issues.append(f"ACCOUNT_EQUITY_USDT='{raw_equity}' is not a valid number")
 
     # Blocking issues: everything except LIVE_ENABLED and equity warnings
     blocking = [

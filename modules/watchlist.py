@@ -38,6 +38,7 @@ import requests
 from datetime import datetime, timezone
 
 from modules.auth_manager import BASE_URL, public_headers
+from modules import settings_manager as cfg
 
 log = logging.getLogger("Watchlist")
 
@@ -62,7 +63,7 @@ MIN_PRICE        = 0.001
 #     violent pump, which a short is on the wrong side of
 # Measured on the 30d set, only 4 of 18 traded symbols were under 90 days, so
 # the filter was not costing much volume at the time.
-MIN_COIN_AGE_DAYS = int(os.getenv("MIN_COIN_AGE_DAYS", "30"))
+# MIN_COIN_AGE_DAYS is read from settings_manager per fetch.
 MIN_RANGE_PCT    = 0.04        # 4% minimum 24h range — skip stable coins
 
 EXCLUDED_BASES = {
@@ -158,6 +159,7 @@ def _fetch_crypto_symbol_set() -> set[str]:
     crypto = set()
     too_new = []
     now_ms = time.time() * 1000
+    MIN_COIN_AGE_DAYS = cfg.get("MIN_COIN_AGE_DAYS")
     age_ms = MIN_COIN_AGE_DAYS * 86400 * 1000
     for sym in data.get("symbols", []):
         if (sym.get("underlyingType") == "COIN"

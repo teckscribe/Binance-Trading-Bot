@@ -40,6 +40,9 @@ from telegram.ext import (
 
 load_dotenv()
 
+from modules import settings_manager as cfg
+cfg.migrate_from_env()
+
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID   = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
 
@@ -63,7 +66,6 @@ STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "ELLIOT_V8": "🟣"}
 SERVICE   = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
-ENV_FILE  = os.path.join(_BOT_DIR, ".env")
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -86,47 +88,26 @@ def _allowed(update: Update) -> bool:
     return True
 
 
-# ─── .env read/write ──────────────────────────────────────────────────────────
+# ─── Settings access ──────────────────────────────────────────────────────────
+# Tunables live in data/settings.json (modules/settings_manager.py) and the
+# scanner re-reads them every cycle, so edits below apply without a restart.
+# Only LIVE_ENABLED is still a .env value — flipping it restarts the scanner.
 
-def _read_env_value(key: str) -> str:
-    """Read a single value from .env file."""
-    try:
-        with open(ENV_FILE, encoding="utf-8", errors="replace") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith(f"{key}="):
-                    return line.split("=", 1)[1].strip()
-    except Exception:
-        pass
-    return ""
+def _setting(key: str) -> str:
+    return cfg.get_str(key)
 
 
-def _write_env_value(key: str, value: str) -> bool:
-    """
-    Update a single key=value line in .env file.
-    Creates the line if it doesn't exist.
-    All other lines are preserved exactly.
-    """
-    try:
-        with open(ENV_FILE, encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-        found = False
-        new_lines = []
-        for line in lines:
-            if line.strip().startswith(f"{key}="):
-                new_lines.append(f"{key}={value}\n")
-                found = True
-            else:
-                new_lines.append(line)
-        if not found:
-            new_lines.append(f"{key}={value}\n")
-        with open(ENV_FILE, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        log.info(f".env updated: {key}={value}")
-        return True
-    except Exception as exc:
-        log.error(f".env write failed: {exc}")
-        return False
+def _set_setting(key: str, value) -> tuple[bool, str]:
+    ok, err = cfg.set_value(key, value)
+    if ok:
+        log.info(f"settings.json updated: {key}={value}")
+    else:
+        log.error(f"settings.json update refused: {err}")
+    return ok, err
+
+
+def _live_enabled() -> bool:
+    return cfg.env_get("LIVE_ENABLED", "false").lower() == "true"
 
 
 # ─── Systemctl helpers ────────────────────────────────────────────────────────
@@ -228,22 +209,19 @@ def _loss_status() -> str:
 
 
 def _capital_status() -> str:
-    val = _read_env_value("ACCOUNT_EQUITY_USDT")
-    return val if val else "not set"
+    return _setting("ACCOUNT_EQUITY_USDT")
 
 def _leverage_status() -> str:
-    val = _read_env_value("GLOBAL_LEVERAGE")
-    return val if val else "Auto"
+    val = cfg.get("GLOBAL_LEVERAGE")
+    return str(val) if val > 0 else "Auto"
 
 
 def _max_concurrent_status() -> str:
-    val = _read_env_value("MAX_CONCURRENT")
-    return val if val else "3 (default)"
+    return _setting("MAX_CONCURRENT")
 
 
 def _max_per_strategy_status() -> str:
-    val = _read_env_value("MAX_PER_STRATEGY")
-    return val if val else "not set (unlimited per strategy)"
+    return _setting("MAX_PER_STRATEGY")
 
 
 def _known_strategy_ids() -> list[str]:
@@ -293,10 +271,7 @@ def validate_max_per_strategy(text: str) -> tuple[bool, str, str]:
     value = ",".join(f"{s}:{n}" for s, n in pairs)
 
     warn = []
-    try:
-        mc = int(_read_env_value("MAX_CONCURRENT") or 3)
-    except ValueError:
-        mc = 3
+    mc = cfg.get("MAX_CONCURRENT")
     over = [f"{s}:{n}" for s, n in pairs if n > mc]
     if over:
         warn.append(f"⚠️ {', '.join(over)} exceed MAX_CONCURRENT={mc} — "
@@ -589,7 +564,7 @@ def _bot_controls_keyboard() -> InlineKeyboardMarkup:
 def _trade_controls_keyboard() -> InlineKeyboardMarkup:
     # Mode label carries the CURRENT state so the submenu doubles as a readout.
     # Kept short so three buttons fit one row without truncating on mobile.
-    mode = "LIVE" if _read_env_value("LIVE_ENABLED").lower() == "true" else "PAPER"
+    mode = "LIVE" if _live_enabled() else "PAPER"
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(f"🔀 {mode}",   callback_data="trade_mode"),
@@ -1039,22 +1014,23 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
 
         old = _capital_status()
-        ok  = _write_env_value("ACCOUNT_EQUITY_USDT", f"{amount:.2f}")
+        ok, err = _set_setting("ACCOUNT_EQUITY_USDT", f"{amount:.2f}")
 
         if ok:
             await update.message.reply_text(
                 f"✅ <b>Capital updated</b>\n\n"
                 f"  Old : <s>${old}</s> USDT\n"
                 f"  New : <b>${amount:,.2f}</b> USDT\n\n"
-                f"⚠️ <b>Restart the scanner</b> to apply the new capital.\n"
-                f"Use 🔄 Restart below.",
+                f"✨ Applies on the scanner's next cycle — no restart needed.\n"
+                f"<i>In PAPER mode this resets the simulated ledger to the new "
+                f"starting balance.</i>",
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
             )
             log.info(f"Capital changed via Telegram: {old} → {amount:.2f}")
         else:
             await update.message.reply_text(
-                "❌ Failed to write .env file. Check server permissions.",
+                f"❌ Could not save: {err}",
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
             )
@@ -1079,15 +1055,16 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
 
         old = _max_concurrent_status()
-        if not _write_env_value("MAX_CONCURRENT", str(n)):
+        ok, err = _set_setting("MAX_CONCURRENT", n)
+        if not ok:
             await update.message.reply_text(
-                "❌ Failed to write .env file. Check server permissions.",
+                f"❌ Could not save: {err}",
                 parse_mode="HTML", reply_markup=_trade_controls_keyboard())
             return
 
         # Re-validate the per-strategy caps against the NEW slot count: caps
         # that were sensible at the old value can be inert or starving now.
-        caps = _read_env_value("MAX_PER_STRATEGY")
+        caps = _setting("MAX_PER_STRATEGY")
         note = ""
         if caps:
             _ok, _v, warn = validate_max_per_strategy(caps)
@@ -1098,8 +1075,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             f"✅ <b>Max Concurrent updated</b>\n\n"
             f"  Old : <s>{old}</s>\n"
             f"  New : <b>{n}</b>\n\n"
-            f"🔄 <b>Restart the scanner</b> for this to take effect — it is read "
-            f"once at startup.{note}",
+            f"✨ Applies on the scanner's next cycle — no restart needed.{note}",
             parse_mode="HTML", reply_markup=_trade_controls_keyboard())
         log.info(f"MAX_CONCURRENT changed via Telegram: {old} -> {n}")
         return
@@ -1115,9 +1091,10 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
 
         old = _max_per_strategy_status()
-        if not _write_env_value("MAX_PER_STRATEGY", value):
+        ok, err = _set_setting("MAX_PER_STRATEGY", value)
+        if not ok:
             await update.message.reply_text(
-                "❌ Failed to write .env file. Check server permissions.",
+                f"❌ Could not save: {err}",
                 parse_mode="HTML", reply_markup=_trade_controls_keyboard())
             return
 
@@ -1125,7 +1102,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             f"✅ <b>Per-Strategy Caps updated</b>\n\n"
             f"  Old : <code>{old}</code>\n"
             f"  New : <code>{value}</code>\n\n"
-            f"🔄 <b>Restart the scanner</b> for this to take effect."
+            f"✨ Applies on the scanner's next cycle — no restart needed."
             + (f"\n\n{msg}" if msg else ""),
             parse_mode="HTML", reply_markup=_trade_controls_keyboard())
         log.info(f"MAX_PER_STRATEGY changed via Telegram: {old} -> {value}")
@@ -1163,7 +1140,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             return
 
         old = _leverage_status()
-        ok  = _write_env_value("GLOBAL_LEVERAGE", f"{amount}")
+        ok, err = _set_setting("GLOBAL_LEVERAGE", amount)
 
         if ok:
             await update.message.reply_text(
@@ -1179,7 +1156,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None
             log.info(f"Leverage changed via Telegram: {old}x → {amount}x")
         else:
             await update.message.reply_text(
-                "❌ Failed to write .env file. Check server permissions.",
+                f"❌ Could not save: {err}",
                 parse_mode="HTML",
                 reply_markup=_main_keyboard(),
             )
@@ -1304,7 +1281,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
     # ── Trade mode (PAPER <-> LIVE) — ask first ───────────────────────────────
     elif data == "trade_mode":
-        cur_live = _read_env_value("LIVE_ENABLED").lower() == "true"
+        cur_live = _live_enabled()
         cur, nxt = ("LIVE", "PAPER") if cur_live else ("PAPER", "LIVE")
         warn = ("\n\n⚠️ <b>LIVE places REAL orders on Binance with real money.</b>"
                 if nxt == "LIVE" else
@@ -1321,10 +1298,10 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
         )
 
     elif data == "do:trade_mode":
-        cur_live = _read_env_value("LIVE_ENABLED").lower() == "true"
+        cur_live = _live_enabled()
         nxt = "false" if cur_live else "true"
         label = "PAPER" if cur_live else "LIVE"
-        if not _write_env_value("LIVE_ENABLED", nxt):
+        if not cfg.env_set("LIVE_ENABLED", nxt):
             await query.edit_message_text(
                 "❌ Could not write .env — mode unchanged.",
                 parse_mode="HTML", reply_markup=_trade_controls_keyboard(),
