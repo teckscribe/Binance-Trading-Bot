@@ -654,3 +654,17 @@ header {
     .set-actions { flex-direction: column; align-items: stretch; }
 }
 
+
+/* ── Kronos / whale progress panel ───────────────────────────────────────── */
+.kp-btn { font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+.kp-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+.kp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.kp-card { background: var(--bg-subtle); border-radius: 12px; padding: 14px 16px; }
+.kp-title { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.kp-bar { height: 10px; border-radius: 6px; background: rgba(15, 23, 42, 0.08); overflow: hidden; }
+.kp-fill { height: 100%; width: 0; background: var(--accent-gradient); border-radius: 6px; transition: width .4s ease; }
+.kp-fill.done { background: #10B981; }
+.kp-line { margin-top: 8px; font-size: 13px; }
+.kp-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.kp-foot { margin-top: 12px; font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kp-foot .kp-btn { margin-left: auto; }

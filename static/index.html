@@ -59,7 +59,36 @@
         <div class="ai-panel">
             <div class="ai-header">
                 <h3>🧠 Multi-Strategy Regime Engine <span id="strategy-count" style="opacity:.6;font-size:.8em;"></span></h3>
-                <span class="ai-badge" id="ai-regime">UNKNOWN 🛡️</span>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <button id="kp-toggle" class="btn-secondary kp-btn">🔬 Kronos / Whale progress</button>
+                    <span class="ai-badge" id="ai-regime">UNKNOWN 🛡️</span>
+                </div>
+            </div>
+            <!-- Shadow-experiment progress: how close Kronos and the whale
+                 collector are to the matched-trade count their verdict tools
+                 (enrich_ablation.py / whale_analyze.py) require. -->
+            <div id="kronos-panel" class="kp-panel" style="display:none;">
+                <div class="kp-grid">
+                    <div class="kp-card">
+                        <div class="kp-title">Kronos shadow gate <span class="pill" id="kp-k-state">—</span></div>
+                        <div class="kp-bar"><div class="kp-fill" id="kp-k-fill" style="width:0%"></div></div>
+                        <div class="kp-line"><b id="kp-k-matched">0</b> / <span id="kp-k-target">80</span> matched CSM trades (<span id="kp-k-pct">0</span>%) · <span id="kp-k-remaining">80</span> to go</div>
+                        <div class="kp-sub">scored <b id="kp-k-scored">0</b> · would-gate <b id="kp-k-gate">0</b> (<span id="kp-k-gaterate">0</span>%) · errors <b id="kp-k-err">0</b> · backlog <b id="kp-k-backlog">0</b></div>
+                        <div class="kp-sub">last scored: <span id="kp-k-last">—</span></div>
+                    </div>
+                    <div class="kp-card">
+                        <div class="kp-title">Whale positioning <span class="pill" id="kp-w-state">—</span></div>
+                        <div class="kp-bar"><div class="kp-fill" id="kp-w-fill" style="width:0%"></div></div>
+                        <div class="kp-line"><b id="kp-w-matched">0</b> / <span id="kp-w-target">120</span> matched CSM trades (<span id="kp-w-pct">0</span>%) · <span id="kp-w-remaining">120</span> to go</div>
+                        <div class="kp-sub">collected <b id="kp-w-scored">0</b> · errors <b id="kp-w-err">0</b> · backlog <b id="kp-w-backlog">0</b></div>
+                        <div class="kp-sub">last collected: <span id="kp-w-last">—</span></div>
+                    </div>
+                </div>
+                <div class="kp-foot">
+                    queue: <b id="kp-q">0</b> CSM candidates · executed CSM trades with outcome: <b id="kp-trades">0</b> ·
+                    <span id="kp-updated">—</span>
+                    <button id="kp-refresh" class="btn-secondary kp-btn">↻ Refresh</button>
+                </div>
             </div>
             <!-- Populated from /api/strategies (StrategyFactory) so this panel
                  cannot drift out of sync with what actually trades. -->

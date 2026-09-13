@@ -777,3 +777,65 @@ document.getElementById('set-reset')?.addEventListener('click', () => {
     setStatus("Changes discarded.");
 });
 
+
+// ─── Kronos / whale shadow-experiment progress ───────────────────────────────
+//
+// Both experiments are observe-only and only deliver a verdict once enough
+// executed CSM trades can be matched to their shadow records (Kronos: 80,
+// whale: 120). The panel shows how close each is, plus worker health.
+
+let KP_TIMER = null;
+
+function kpFmtTs(s) {
+    if (!s) return "—";
+    const d = new Date(s);
+    return isNaN(d) ? String(s) : d.toLocaleString();
+}
+
+function kpFill(prefix, b) {
+    const set = (id, v) => { const el = document.getElementById(`kp-${prefix}-${id}`); if (el) el.textContent = v; };
+    const fill = document.getElementById(`kp-${prefix}-fill`);
+    if (fill) {
+        fill.style.width = `${b.pct}%`;
+        fill.classList.toggle("done", b.state === "READY");
+    }
+    const st = document.getElementById(`kp-${prefix}-state`);
+    if (st) {
+        st.textContent = b.state === "READY" ? "READY — run verdict" : "COLLECTING";
+        st.className = "pill " + (b.state === "READY" ? "pill-green" : "pill-amber");
+    }
+    set("matched", b.matched); set("target", b.target); set("pct", b.pct);
+    set("remaining", b.remaining); set("scored", b.scored); set("err", b.errors);
+    set("backlog", b.backlog); set("last", kpFmtTs(b.last_activity));
+    if (b.would_gate !== undefined) { set("gate", b.would_gate); set("gaterate", b.gate_rate_pct); }
+}
+
+async function fetchKronosProgress() {
+    const upd = document.getElementById("kp-updated");
+    try {
+        const r = await fetch("/api/kronos/progress");
+        const d = await r.json();
+        if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+        kpFill("k", d.kronos);
+        kpFill("w", d.whale);
+        const q = document.getElementById("kp-q"); if (q) q.textContent = d.queue.candidates;
+        const t = document.getElementById("kp-trades"); if (t) t.textContent = d.csm_trades_with_outcome;
+        if (upd) upd.textContent = `updated ${kpFmtTs(d.generated)}`;
+    } catch (err) {
+        if (upd) upd.textContent = `Could not load: ${err.message}`;
+    }
+}
+
+document.getElementById("kp-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("kronos-panel");
+    if (!panel) return;
+    const open = panel.style.display === "none";
+    panel.style.display = open ? "" : "none";
+    if (open) {
+        fetchKronosProgress();
+        KP_TIMER = setInterval(fetchKronosProgress, 60000);
+    } else if (KP_TIMER) {
+        clearInterval(KP_TIMER); KP_TIMER = null;
+    }
+});
+document.getElementById("kp-refresh")?.addEventListener("click", fetchKronosProgress);

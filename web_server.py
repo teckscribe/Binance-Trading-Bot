@@ -493,6 +493,17 @@ async def get_settings():
     }
 
 
+@app.get("/api/kronos/progress")
+async def get_kronos_progress():
+    """How far the Kronos and whale shadow experiments are from a verdict."""
+    try:
+        from kronos.progress import progress
+        return progress()
+    except Exception as exc:
+        log.error(f"kronos progress failed: {exc}")
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.get("/api/settings/history")
 async def get_settings_history(limit: int = 30):
     """Recent setting changes (newest first), with who made them."""
