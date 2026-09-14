@@ -207,11 +207,27 @@ Fix (`94953f5`): fetch returns `None` on failure and reconcile skips the cycle; 
 
 **0.5.7 ELLIOT_V8 removed.** Benched since 09-12 (PF ~1.01, after-tax negative), permitted nowhere, `MAX_PER_STRATEGY … ELLIOT_V8:0` on the box — it produced no trades, so keeping it only added dead branches and a strategy the Kronos tooling could never evaluate. Deleted `freqtrade_port_elliot.py`; removed from factory, regime matrix, leverage table, settings default, bots, notifiers, dashboard, backtesters, tools, replay sync list. Historical logs/docs untouched. On-box `settings.json` still lists `ELLIOT_V8:0` in caps and `strategy_overrides.json` has an entry — both ignored; the bots' cap validator will reject `ELLIOT_V8` on the next manual edit, which is the desired prompt to drop it.
 
+**0.5.8 Whale positioning per strategy** (`6182797`, 2026-09-14 16:00 IST). `whale_analyze.py` `_analyze(sid)` and `progress.py` report CSM and NASOS_V4 separately against WHALE_MIN_N=120; dashboard card shows both. NASOS whale-matched count starts at 0 from this deploy; same ~4× slower accrual as its Kronos queue.
+
+**0.5.9 Dead-code / wiring cross-check** (`9be4a50`, 2026-09-14 17:00 IST). Method: byte-compile all; pyflakes (undefined names → 0; unused/shadowed imports → 20 removed, 3 of them introduced by this week's changes); grep every `def`/`class` for references across `.py/.js/.html` → 15 unreferenced, 13 removed, `get_session()`/`bar_time()` kept as documented helpers; `freqtrade_port_sma.py` deleted. Deliberately untouched: unused locals in offline backtest scripts, `SMA_OFFSET` leverage-table/label entries (historical positions), `kronos/src/` (vendored upstream). Verification: settings wiring audit, every service/tool imports, factory `['CSM','NASOS_V4']`, 7 scratch suites green, all `/api/*` GET 200, no unreferenced JS. No behaviour change.
+
+**0.5.10 Kronos win% split (81 matched CSM trades, `ml_kronos_enriched.jsonl`, 2026-09-14 17:30 IST).**
+
+| Bucket | N | Win% | PF | Σ PnL |
+|---|---|---|---|---|
+| ALL (no gate) | 81 | 44.4 | 0.92 | −0.9% |
+| PASS ≥ 0.025 (live) | 19 | **63.2** | 3.96 | +3.3% |
+| BLOCK < 0.025 | 62 | 38.7 | 0.57 | −4.2% |
+| PASS ≥ 0.020 | 31 | 54.8 | 1.75 | +2.5% |
+| BLOCK < 0.020 | 50 | 38.0 | 0.55 | −3.4% |
+
+24-point win% spread at the live threshold. Same caveats as §0.4: N=19 PASS, profit concentrated in a few trades, sample contains §0.5.1 phantoms. Win% is the more stable statistic; first decision-grade reading is the live-gated win%/PF after ≥40 gated CSM trades (dashboard Kronos panel).
+
 ---
 
 ## 1. CURRENT STATE
 
-*Last updated: 2026-09-12. Sections below this point may use earlier parameter values
+*Last updated: 2026-09-14. Sections below this point may use earlier parameter values
 recorded at the time of their experiment — see this section for the live production state.*
 
 ### Strategy configuration (as of 2026-09-12)
@@ -2990,7 +3006,7 @@ Full production release deployed. All files below were synced to the Ubuntu VPS.
 
 ---
 
-## 20. FILES TO DEPLOY TO UBUNTU (2026-09-12) — supersedes §19
+## 20. FILES TO DEPLOY TO UBUNTU (2026-09-12) — supersedes §19, superseded by §21
 
 Settings migration (§0.3). Pull the whole tree; the files that matter:
 
@@ -3014,6 +3030,31 @@ Settings migration (§0.3). Pull the whole tree; the files that matter:
 **Generated on first start (do not copy from dev):** `data/settings.json`, `data/settings_history.jsonl`.
 
 **`.env` on the box:** unchanged. Migrated keys may be deleted from it later (cosmetic).
+
+---
+
+## 21. FILES TO DEPLOY TO UBUNTU (2026-09-14) — supersedes §20
+
+Commits `52b2a1a` → `9be4a50` (§0.4, §0.5). Pull the whole tree and **restart all four services** — the strategy factory, notifiers and Kronos queue are not hot-reloaded:
+
+```
+cd /home/psms/ubuntu/program_files/csb && git pull && sudo systemctl restart csb csb-bot csb-discord csb-web
+```
+
+| File | Change | §Ref |
+|---|---|---|
+| `modules/order_engine.py` | Reconcile: no close without a fill; `None` on failed read; exchange-stop classification | §0.5.1 |
+| `modules/rate_budget.py` (**NEW**), `modules/auth_manager.py` | Weight-aware throttle on `SESSION.request` | §0.5.2 |
+| `live_scanner.py` | `_kronos_gate()`, entry/exit context capture, MFE/MAE, `_current_regime`, NASOS shadow queue | §0.4, §0.5.3, §0.5.5 |
+| `modules/settings_manager.py` | `KRONOS_GATE`, `KRONOS_PF_THR`, `KRONOS_GATE_WAIT_SEC`; default caps `CSM:3,NASOS_V4:3` | §0.4, §0.5.7 |
+| `kronos/shadow_client.py`, `kronos/progress.py`, `kronos/enrich_ablation.py`, `kronos/whale_analyze.py` | Per-strategy queue/progress/ablation/whale | §0.5.5, §0.5.8 |
+| `live_logger.py`, `modules/ml_engine.py` | Context keys on EXIT records and outcome rows | §0.5.3 |
+| `telegram_notifier.py`, `discord_notifier.py`, `telegram_bot.py`, `discord_bot.py` | Kronos/regime lines; ELLIOT removed; dead handlers removed | §0.5.3, §0.5.7, §0.5.9 |
+| `web_server.py`, `static/*` | `/api/kronos/progress`, Kronos/Whale panel, Kronos + Regime columns | §0.4, §0.5.8 |
+| `modules/regime_engine.py`, `modules/risk_engine.py`, `modules/strategies/strategy_factory.py` | ELLIOT removed; SMA port deleted | §0.5.7, §0.5.9 |
+| **Deleted:** `modules/strategies/freqtrade_port_elliot.py`, `modules/strategies/freqtrade_port_sma.py` | | §0.5.7, §0.5.9 |
+
+**Post-restart checks:** journal shows strategies `['CSM', 'NASOS_V4']`, gate `live / 0.025 / 8s`, scan 120s / fast 1s; `curl localhost:8102/api/kronos/progress` returns CSM and NASOS_V4 blocks. On-box `settings.json` may still carry `ELLIOT_V8:0` in `MAX_PER_STRATEGY` — ignored; drop it on the next cap edit.
 
 ---
 
