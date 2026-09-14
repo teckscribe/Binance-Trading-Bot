@@ -101,6 +101,26 @@ def notify_startup(regime: dict, n_symbols: int, n_scan: int = 0, permitted_stra
     _send(text)
 
 
+def _kronos_line(d: dict) -> str:
+    """'+0.0312 (thr 0.025) PASS' for a CSM signal/position; '' otherwise.
+
+    kronos_pred_fav is None when the entry proceeded without a score
+    (fail-open) and absent for non-CSM strategies or when the gate is off.
+    """
+    if d.get("strategy") != "CSM" or "kronos_pred_fav" not in d:
+        return ""
+    pf = d.get("kronos_pred_fav")
+    if pf is None:
+        return "no score (fail-open)"
+    try:
+        from modules import settings_manager as cfg
+        thr = float((d.get("settings_entry") or {}).get("KRONOS_PF_THR", cfg.get("KRONOS_PF_THR")))
+    except Exception:
+        thr = None
+    tag = "" if thr is None else f" (thr {thr:.3f}) {'PASS' if pf >= thr else 'below'}"
+    return f"{pf:+.4f}{tag}"
+
+
 def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None:
     strat     = signal.get("strategy", "?")
     meta      = _STRATEGY_META.get(strat, {"emoji": "⚪", "label": strat})
@@ -121,6 +141,9 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
         f"\U0001f480 Liq price: <b>{liq_price:.4f}</b>\n"
         f"\U0001f4dd Reason   : {signal.get('reason', '')}"
     )
+    k = _kronos_line(signal)
+    if k:
+        text += f"\n\U0001f52c Kronos   : <b>{k}</b>"
     _send(text)
 
 
@@ -157,6 +180,12 @@ def notify_exit(position: dict, mode: str = "LIVE") -> None:
         f"{pnl_dot} <b>Net ROI</b>    : <b>{net_roi:+.2f}%</b> ({leverage}x)\n"
         f"📈 <b>Equity P&amp;L</b> : <b>{equity_pnl:+.3f}%</b>"
     )
+    k = _kronos_line(position)
+    if k:
+        text += f"\n\U0001f52c Kronos     : {k}"
+    if position.get("regime_entry"):
+        rx = position.get("regime_exit")
+        text += f"\n\U0001f6e1 Regime     : {position['regime_entry']}" + (f" → {rx}" if rx and rx != position['regime_entry'] else "")
     _send(text)
 
 

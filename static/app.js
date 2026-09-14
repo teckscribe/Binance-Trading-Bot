@@ -1,5 +1,24 @@
 // app.js - CSB Web Server Frontend Logic
 
+// Kronos score for a CSM trade/position. null = entered with no score
+// (fail-open); absent = non-CSM or gate off.
+function kronosCell(r) {
+    if (r.strategy !== "CSM" || !("kronos_pred_fav" in r)) return '<span class="dim">—</span>';
+    const pf = r.kronos_pred_fav;
+    if (pf === null || pf === undefined) return '<span class="text-amber" title="entered without a score (fail-open)">n/a</span>';
+    const thr = Number(r.settings_entry?.KRONOS_PF_THR);
+    const ok = isFinite(thr) ? pf >= thr : null;
+    const cls = ok === null ? "" : ok ? "text-green" : "text-amber";
+    return `<span class="${cls}" title="${isFinite(thr) ? "threshold " + thr : ""}">${(pf >= 0 ? "+" : "") + Number(pf).toFixed(4)}</span>`;
+}
+
+function regimeCell(r) {
+    if (!r.regime_entry) return '<span class="dim">—</span>';
+    const short = (x) => String(x).replace("_TREND", "");
+    if (r.regime_exit && r.regime_exit !== r.regime_entry) return `${short(r.regime_entry)} → ${short(r.regime_exit)}`;
+    return short(r.regime_entry);
+}
+
 async function fetchStatus() {
     try {
         const response = await fetch('/api/status');
@@ -110,8 +129,8 @@ async function fetchStatus() {
         if(tbody && data.active_positions) {
             if(data.active_positions.length === 0) {
                 tbody.innerHTML = isOffline
-                    ? '<tr><td colspan="11" class="empty-msg">Scanner stopped — no open positions.</td></tr>'
-                    : '<tr><td colspan="11" class="empty-msg">No active open positions. Auto-trader scanning market...</td></tr>';
+                    ? '<tr><td colspan="12" class="empty-msg">Scanner stopped — no open positions.</td></tr>'
+                    : '<tr><td colspan="12" class="empty-msg">No active open positions. Auto-trader scanning market...</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 // If the scanner is down these rows are a frozen snapshot, not
@@ -119,7 +138,7 @@ async function fetchStatus() {
                 // Label them rather than letting them read as current.
                 if (isOffline) {
                     const warn = document.createElement('tr');
-                    warn.innerHTML = `<td colspan="11" class="empty-msg" style="color:var(--warn);">
+                    warn.innerHTML = `<td colspan="12" class="empty-msg" style="color:var(--warn);">
                         ⚠️ Scanner is stopped — these are the last known positions, not live data.
                         Check Telegram for actual close confirmations.</td>`;
                     tbody.appendChild(warn);
@@ -144,6 +163,7 @@ async function fetchStatus() {
                         <td class="${pnlClass}">${roiNum.toFixed(2)}% <span class="pnl-usd">${usd(pnlUsdt)}</span></td>
                         <td>$${pos.sl_price ? pos.sl_price.toFixed(4) : '--'}</td>
                         <td>${pos.duration_min || 0}</td>
+                        <td>${kronosCell(pos)}</td>
                         <td><button class="btn-square-off" onclick="squareOff('${pos.symbol}','${pos.direction}',this,${pos.pnl_equity_pct ?? 'null'},${pnlUsdt ?? 'null'})">Square Off</button></td>
                     `;
                     tbody.appendChild(tr);
@@ -174,7 +194,7 @@ async function fetchTrades() {
         const tbody = document.getElementById('decisions-tbody');
         if(tbody && data.trades) {
             if(data.trades.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="empty-msg">No closed trades yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" class="empty-msg">No closed trades yet.</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 data.trades.forEach(trade => {
@@ -223,6 +243,8 @@ async function fetchTrades() {
                         <td>${trade.exit_reason || trade.reason || "--"}</td>
                         <td class="${pnlClass}">${pnl}% <span class="pnl-usd">${usd(pnlUsdt)}</span></td>
                         <td>${trade.duration_min || 0}m</td>
+                        <td>${kronosCell(trade)}</td>
+                        <td>${regimeCell(trade)}</td>
                     `;
                     tbody.appendChild(tr);
                 });

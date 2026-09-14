@@ -668,3 +668,5 @@ header {
 .kp-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .kp-foot { margin-top: 12px; font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .kp-foot .kp-btn { margin-left: auto; }
+
+.dim { color: var(--text-muted); }

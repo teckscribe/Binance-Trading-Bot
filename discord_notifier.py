@@ -133,6 +133,26 @@ def notify_startup(
     _send_embed(embed)
 
 
+def _kronos_line(d: dict) -> str:
+    """'+0.0312 (thr 0.025) PASS' for a CSM signal/position; '' otherwise.
+
+    kronos_pred_fav is None when the entry proceeded without a score
+    (fail-open) and absent for non-CSM strategies or when the gate is off.
+    """
+    if d.get("strategy") != "CSM" or "kronos_pred_fav" not in d:
+        return ""
+    pf = d.get("kronos_pred_fav")
+    if pf is None:
+        return "no score (fail-open)"
+    try:
+        from modules import settings_manager as cfg
+        thr = float((d.get("settings_entry") or {}).get("KRONOS_PF_THR", cfg.get("KRONOS_PF_THR")))
+    except Exception:
+        thr = None
+    tag = "" if thr is None else f" (thr {thr:.3f}) {'PASS' if pf >= thr else 'below'}"
+    return f"{pf:+.4f}{tag}"
+
+
 def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None:
     strat     = signal.get("strategy", "?")
     meta      = _STRATEGY_META.get(strat, {"emoji": "⚪", "label": strat})
@@ -158,6 +178,9 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
             {"name": "Reason",    "value": signal.get("reason", "—"),          "inline": False},
         ],
     }
+    k = _kronos_line(signal)
+    if k:
+        embed["fields"].append({"name": "Kronos", "value": f"**{k}**", "inline": False})
     _send_embed(embed)
 
 
@@ -193,6 +216,13 @@ def notify_exit(position: dict, mode: str = "LIVE") -> None:
             {"name": "Reason",    "value": position.get("exit_reason", "?"),   "inline": True},
         ],
     }
+    k = _kronos_line(position)
+    if k:
+        embed["fields"].append({"name": "Kronos", "value": k, "inline": True})
+    if position.get("regime_entry"):
+        rx = position.get("regime_exit")
+        val = position["regime_entry"] + (f" → {rx}" if rx and rx != position["regime_entry"] else "")
+        embed["fields"].append({"name": "Regime", "value": val, "inline": True})
     _send_embed(embed)
 
 
