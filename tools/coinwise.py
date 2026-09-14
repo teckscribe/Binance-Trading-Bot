@@ -15,7 +15,7 @@ syms = sorted(os.path.basename(p).split("_15m_")[0]
               for p in glob.glob("data/*_15m_%dd.csv" % DATA_DAYS))
 syms = [s for s in syms if not bt.is_equity(s)]
 tr = bt.collect_trades(syms, ["CSM", "NASOS_V4"], None, days=DATA_DAYS,
-                       cache_path="data/bt_cache_%dd_CSM-NASOS-SMA-ELLIOT.json" % DATA_DAYS)
+                       cache_path="data/bt_cache_%dd_CSM-NASOS.json" % DATA_DAYS)
 last = max(t["entry_time"] for t in tr)
 sub = [t for t in tr if t["entry_time"] >= last - pd.Timedelta(days=WINDOW)]
 if ONLY:

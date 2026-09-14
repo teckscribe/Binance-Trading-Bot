@@ -723,10 +723,8 @@ def _check_hard_levels(pos: dict, df_1m) -> dict | None:
         NASOS_V4    with stop   147 trades   3.0h median   worst  -8.08%
                     without      17 trades   414h median   worst -87.96%
                                  (100% of positions ran to end-of-data)
-        ELLIOT_V8   worst trade  -8.08%  ->  -48.17%
 
-    NASOS stopped being a strategy and became buy-and-hold; ELLIOT kept
-    trading, which hid the defect while its loss tail grew six-fold.
+    NASOS stopped being a strategy and became buy-and-hold.
 
     Enforcing it at this choke point rather than per strategy makes the whole
     class of bug structurally impossible: a new strategy cannot forget to

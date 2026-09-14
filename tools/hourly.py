@@ -16,7 +16,7 @@ STRAT = sys.argv[1] if len(sys.argv) > 1 else "CSM"
 syms = sorted(os.path.basename(p).split("_15m_")[0] for p in glob.glob("data/*_15m_90d.csv"))
 syms = [s for s in syms if not bt.is_equity(s)]
 tr = bt.collect_trades(syms, ["CSM","NASOS_V4"], None, days=90,
-                       cache_path="data/bt_cache_90d_CSM-NASOS-SMA-ELLIOT.json")
+                       cache_path="data/bt_cache_90d_CSM-NASOS.json")
 tr = [t for t in tr if t["strategy"] == STRAT] if STRAT != "ALL" else tr
 
 IST = pd.Timedelta(hours=5, minutes=30)

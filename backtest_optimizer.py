@@ -682,8 +682,7 @@ def run_backtest_1m(strategy_class, symbol, regime_series=None,
         # Either way the figures are wrong. Long-heavy results produced by this
         # function before 2026-08-29 are overstated (EXPERIMENT_LOG 17.13 /
         # 17.15 and the 17.21 regime table all predate the fix). NASOS_V4 reads
-        # df_1h only via .iloc[-4:-1] and ELLIOT_V8 not at all, so the port
-        # numbers are unaffected.
+        # df_1h only via .iloc[-4:-1], so the port numbers are unaffected.
         #
         # BT_LOOKAHEAD_1H=true restores the old behaviour so historical runs
         # stay reproducible. It is not a tuning knob.

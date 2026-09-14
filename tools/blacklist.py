@@ -9,7 +9,7 @@ logging.disable(logging.WARNING)
 syms = sorted(os.path.basename(p).split("_15m_")[0] for p in glob.glob("data/*_15m_90d.csv"))
 syms = [s for s in syms if not bt.is_equity(s)]
 tr = bt.collect_trades(syms, ["CSM","NASOS_V4"], None, days=90,
-                       cache_path="data/bt_cache_90d_CSM-NASOS-SMA-ELLIOT.json")
+                       cache_path="data/bt_cache_90d_CSM-NASOS.json")
 last = max(t["entry_time"] for t in tr)
 
 def window(days, strat="CSM"):
