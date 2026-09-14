@@ -34,19 +34,31 @@ def T(s):
     except Exception: return None
 
 
+STRATEGIES = ("CSM", "NASOS_V4")
+
+
 def main():
-    whale = [r for r in load_jsonl(os.path.join(_HERE, "logs", "whale_scores.jsonl"))
-             if "err" not in r and r.get("top_ls") is not None]
+    whale_all = [r for r in load_jsonl(os.path.join(_HERE, "logs", "whale_scores.jsonl"))
+                 if "err" not in r and r.get("top_ls") is not None]
+    sigs = {s["signal_id"]: s for s in load_jsonl(os.path.join(_ROOT, "data", "ml", "signals.jsonl")) if "signal_id" in s}
+    outs = {o["signal_id"]: o for o in load_jsonl(os.path.join(_ROOT, "data", "ml", "outcomes.jsonl")) if "signal_id" in o}
+    for strategy in STRATEGIES:
+        print(f"\n{'=' * 20} {strategy} {'=' * 20}")
+        _analyze(strategy, whale_all, sigs, outs)
+
+
+def _analyze(strategy, whale_all, sigs, outs):
+    # Queue rows carry a strategy tag since 2026-09-14 (NASOS_V4 queued
+    # alongside CSM); untagged rows are CSM. A trade only matches positioning
+    # rows collected for a candidate of the same strategy.
+    whale = [r for r in whale_all if r.get("strategy", "CSM") == strategy]
     byS = {}
     for r in whale:
         byS.setdefault(r["symbol"], []).append(r)
 
-    sigs = {s["signal_id"]: s for s in load_jsonl(os.path.join(_ROOT, "data", "ml", "signals.jsonl")) if "signal_id" in s}
-    outs = {o["signal_id"]: o for o in load_jsonl(os.path.join(_ROOT, "data", "ml", "outcomes.jsonl")) if "signal_id" in o}
-
     rows = []
     for sid, s in sigs.items():
-        if s.get("strategy") != "CSM":
+        if s.get("strategy") != strategy:
             continue
         o = outs.get(sid)
         if not o:
@@ -73,9 +85,9 @@ def main():
             "smart_crowd": (top / glob) if (top and glob and glob > 0) else 0.0,
         })
 
-    print(f"whale_scores rows: {len(whale)}   matched CSM outcomes: {len(rows)}")
+    print(f"whale_scores rows: {len(whale)}   matched {strategy} outcomes: {len(rows)}")
     if len(rows) < MIN_N:
-        print(f"\nDEFERRED: need >= {MIN_N} matched CSM trades, have {len(rows)}.")
+        print(f"\nDEFERRED: need >= {MIN_N} matched {strategy} trades, have {len(rows)}.")
         print("  Re-run as whale_worker + live trades accumulate.")
         return
 

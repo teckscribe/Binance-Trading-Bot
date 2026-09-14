@@ -160,7 +160,12 @@ def progress() -> dict:
 
     w_ok = [r for r in wrows if "err" not in r and r.get("top_ls") is not None]
     w_err = len(wrows) - len(w_ok)
-    w_matched = _match_whale(trades, w_ok)
+    w_by = {s: [r for r in w_ok if r.get("strategy", "CSM") == s] for s in SHADOW_STRATEGIES}
+    w_matched = _match_whale(trades, w_by["CSM"])
+    w_by_strategy = {s: {"collected": len(w_by[s]),
+                         "matched": _match_whale(_trades(s), w_by[s]),
+                         "trades_with_outcome": len(_trades(s))}
+                     for s in SHADOW_STRATEGIES}
 
     def block(matched, target, scored, errors, backlog, last, extra=None):
         pct = min(100.0, round(100.0 * matched / target, 1)) if target else 0.0
@@ -197,7 +202,8 @@ def progress() -> dict:
                          "verdict_tool": "kronos/enrich_ablation.py"}),
         "whale": block(w_matched, WHALE_TARGET, len(w_ok), w_err,
                        _backlog(WHALE_OFF, REQ), _last(wrows, "collected_at") or _last(wrows, "ts"),
-                       {"verdict_tool": "kronos/whale_analyze.py"}),
+                       {"by_strategy": w_by_strategy,
+                        "verdict_tool": "kronos/whale_analyze.py"}),
     }
 
 
