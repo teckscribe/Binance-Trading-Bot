@@ -56,25 +56,22 @@ class NASOSv4Port(BaseStrategy):
     REQUIRES_1H = True
     REQUIRES_1M_DEPTH = 1500
 
+    @staticmethod
+    def _to_5m(df_1m: pd.DataFrame) -> pd.DataFrame:
+        """1m -> 5m OHLCV. Live frames carry a 'timestamp' column (RangeIndex);
+        backtest frames carry a DatetimeIndex. Shared by scan() and manage()."""
+        agg = {'open': 'first', 'high': 'max', 'low': 'min',
+               'close': 'last', 'volume': 'sum'}
+        if 'timestamp' in df_1m.columns:
+            return df_1m.resample('5min', on='timestamp').agg(agg).dropna()
+        return df_1m.resample('5min').agg(agg).dropna()
+
     def scan(self, symbol: str, df_1m: pd.DataFrame, df_15m: pd.DataFrame, df_1h: pd.DataFrame, regime: dict) -> dict | None:
         if df_1m is None or len(df_1m) < 1000:
             return None
 
-        # Resample to 5m
-        df_5m = df_1m.resample('5min', on='timestamp').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna() if 'timestamp' in df_1m.columns else df_1m.resample('5min').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna()
-        
+        df_5m = self._to_5m(df_1m)
+
         if len(df_5m) < 200:
             return None
 
@@ -179,7 +176,6 @@ class NASOSv4Port(BaseStrategy):
                 'atr': atr,
                 'strength': strength_val,
                 'reason': 'NASOS_V4_Entry',
-                'leverage': 1
             }
 
         return None
@@ -195,19 +191,7 @@ class NASOSv4Port(BaseStrategy):
             if self.hold_minutes(position, df_1m) >= max_hold:
                 return make_exit(float(df_1m["close"].iloc[-1]), "MAX_HOLD")
 
-        df_5m = df_1m.resample('5min', on='timestamp').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna() if 'timestamp' in df_1m.columns else df_1m.resample('5min').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna()
+        df_5m = self._to_5m(df_1m)
 
         if len(df_5m) < 55:
             return no_exit()

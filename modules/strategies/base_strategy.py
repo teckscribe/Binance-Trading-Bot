@@ -253,6 +253,29 @@ class BaseStrategy(ABC):
             return "BE_HIT" if sl >= entry * 0.9985 else "TRAIL_HIT"
         return "BE_HIT" if sl <= entry * 1.0015 else "TRAIL_HIT"
 
+    @staticmethod
+    def hold_minutes(position: dict, df: pd.DataFrame) -> float:
+        """
+        Minutes between the position's entry_time and the latest bar in `df`.
+        0.0 if either cannot be read.
+
+        pd.to_datetime on both sides, NOT datetime.fromisoformat: live stores
+        entry_time as an ISO string, the backtest harness as a pd.Timestamp,
+        and fromisoformat raises on the latter (see the CSM max-hold note).
+        Reads the 'timestamp' column when present, else the index, so it works
+        on both frame layouts (see bar_time()).
+        """
+        try:
+            entry_t = pd.to_datetime(position["entry_time"], utc=True)
+            bar_t = pd.to_datetime(
+                df["timestamp"].iloc[-1] if "timestamp" in df.columns
+                else df.index[-1],
+                utc=True,
+            )
+            return (bar_t - entry_t).total_seconds() / 60
+        except Exception:
+            return 0.0
+
     @abstractmethod
     def scan(
         self,

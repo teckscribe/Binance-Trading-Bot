@@ -1281,7 +1281,8 @@ _kronos_gated_notified: dict[str, datetime] = {}
 # Strategies whose candidates are queued for Kronos scoring (shadow data), and
 # the subset the live gate actually acts on. NASOS_V4 is shadow-only until it
 # has its own verdict — the 0.025 threshold was measured on CSM and does not
-# transfer. Read per call so the sets can grow without touching the loop.
+# transfer. Module constants — changing them needs a restart; deliberately
+# not a hot setting so the gated set cannot be widened from a bot command.
 KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4")
 KRONOS_GATE_STRATEGIES   = ("CSM",)
 

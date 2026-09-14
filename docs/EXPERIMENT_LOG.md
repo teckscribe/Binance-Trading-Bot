@@ -223,6 +223,10 @@ Fix (`94953f5`): fetch returns `None` on failure and reconcile skips the cycle; 
 
 24-point win% spread at the live threshold. Same caveats as §0.4: N=19 PASS, profit concentrated in a few trades, sample contains §0.5.1 phantoms. Win% is the more stable statistic; first decision-grade reading is the live-gated win%/PF after ≥40 gated CSM trades (dashboard Kronos panel).
 
+**0.5.11 External audit response (2026-09-14 19:00 IST).** A 14-item audit was checked line by line against the code.
+Confirmed and fixed (`hold_minutes` commit): (1) **HIGH** `NASOSv4Port.manage()` → `self.hold_minutes()` undefined — dormant only because `PORT_MAX_HOLD_MIN=0`; the setting is hot, so a dashboard edit would have raised `AttributeError` on every NASOS manage cycle and left the position unmanaged by the strategy (exchange stop still resting). Added `BaseStrategy.hold_minutes(position, df)`; tested both frame layouts, ISO-string and `pd.Timestamp` entry_time, and the armed guard. Missed by the §0.5.9 pyflakes sweep because attribute access on `self` is not statically checked. (2) dead `'leverage': 1` in the NASOS signal — never read; `_execute_entries` uses `get_leverage("NASOS_V4")` = 3×; key removed, table unchanged (backtests ran at 3×). (3) duplicated 5m resample → `_to_5m()`. (4–6) stale comments in `regime_engine.py`, `live_scanner.py`, `risk_engine.py`. (7–8) `ELLIOT_V8` in dev `settings.json` caps and `strategy_overrides.json` removed. **On the box, run once:** edit `MAX_PER_STRATEGY` via the dashboard/bot to `CSM:2,NASOS_V4:2`, and delete the `ELLIOT_V8` block from `data/strategy_overrides.json` (any command touching it is already rejected — `set_disabled()` validates against the factory, so the audit's "`/enable ELLIOT_V8` will succeed" claim was wrong).
+Rejected: `get_oi_trend()` "dead" — used by `trend_pullback.py`, kept for `backtest_optimizer.py`; "fast cycle 1500-depth → 1800 weight/min" — fast cycles fetch `limit=400` (w2) + mark, ≈540/min (§0.5.2), and the throttle caps it regardless; SPEC default `MAX_PER_STRATEGY` 3:3 → 2:2 — the default is the historical `.env` default, the box's 2:2 is a per-deployment choice in `settings.json`; NASOS in BEAR_TREND — measured (§17.31/17.32), a decision not a bug; `MAX_TOTAL_MARGIN_PCT=0.9`, `FOCUSED 150/200`, `FAST_INTERVAL=1` — operator choices, not findings; "empty" stale `logs/strategies/{ELLIOT_V8,LIQ,OIB,VRP,WKD}` — not empty, they hold August daily logs (git-ignored) and stay as history.
+
 ---
 
 ## 1. CURRENT STATE
@@ -3052,6 +3056,7 @@ cd /home/psms/ubuntu/program_files/csb && git pull && sudo systemctl restart csb
 | `telegram_notifier.py`, `discord_notifier.py`, `telegram_bot.py`, `discord_bot.py` | Kronos/regime lines; ELLIOT removed; dead handlers removed | §0.5.3, §0.5.7, §0.5.9 |
 | `web_server.py`, `static/*` | `/api/kronos/progress`, Kronos/Whale panel, Kronos + Regime columns | §0.4, §0.5.8 |
 | `modules/regime_engine.py`, `modules/risk_engine.py`, `modules/strategies/strategy_factory.py` | ELLIOT removed; SMA port deleted | §0.5.7, §0.5.9 |
+| `modules/strategies/base_strategy.py`, `modules/strategies/freqtrade_port_nasos.py` | `hold_minutes()` added (crash fix behind `PORT_MAX_HOLD_MIN`); dead leverage key; `_to_5m()` | §0.5.11 |
 | **Deleted:** `modules/strategies/freqtrade_port_elliot.py`, `modules/strategies/freqtrade_port_sma.py` | | §0.5.7, §0.5.9 |
 
 **Post-restart checks:** journal shows strategies `['CSM', 'NASOS_V4']`, gate `live / 0.025 / 8s`, scan 120s / fast 1s; `curl localhost:8102/api/kronos/progress` returns CSM and NASOS_V4 blocks. On-box `settings.json` may still carry `ELLIOT_V8:0` in `MAX_PER_STRATEGY` — ignored; drop it on the next cap edit.

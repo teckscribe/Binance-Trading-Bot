@@ -455,8 +455,9 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # -0.060% on 217 trades vs +0.023% on 1,490 at 90 days) and its matrix scored
 # WORST of the four. Do not re-derive this from a window under 30 days.
 #
-# To re-enable either strategy, add it back to the relevant regime below —
-# both remain in StrategyFactory and are fully wired, just not permitted.
+# (Historical: LIQ and VRP were later deleted from the codebase outright —
+# no source file remains, so re-enabling either would mean a rewrite, not a
+# permission edit.)
 # 2026-08-12: opened up by request. All three production strategies (CSM, VRP,
 # LIQ) are permitted in every regime, so this table no longer gates anything —
 # runtime control is the Telegram/Discord "/disable <ID>" command

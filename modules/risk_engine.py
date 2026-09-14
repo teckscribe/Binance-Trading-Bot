@@ -267,7 +267,7 @@ def compute_position_size(
         account_equity : Total USDT equity in the account
         entry_price    : Planned entry price
         sl_price       : Stop loss price
-        strategy_id    : 'TP' | 'FF' | 'DB' | 'GRID' | 'BBR'
+        strategy_id    : 'CSM' | 'NASOS_V4' | str — looked up in STRATEGY_LEVERAGE
         risk_mult      : ML confidence multiplier (0.3–1.0). Scales risk_usdt
                          without changing leverage or margin cap. Default 1.0
                          (no adjustment). Set by ml_engine Phase 2+.
