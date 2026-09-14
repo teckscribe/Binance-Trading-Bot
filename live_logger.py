@@ -249,6 +249,23 @@ def _rebuild_strategy_txt(strategy: str, date: str = None) -> None:
 
 # ─── Main logger class ────────────────────────────────────────────────────────
 
+# Keys carried from the position dict into every EXIT record when present.
+_CONTEXT_KEYS = (
+    "entry_time", "exit_time", "contracts", "margin_req", "risk_usdt",
+    "account_equity", "initial_sl_price", "atr", "liq_price",
+    "regime_entry", "regime_exit", "regime_changed_in_trade",
+    "regime_age_min_entry", "btc_price_entry", "btc_price_exit",
+    "btc_trend_entry", "eth_trend_entry", "sol_trend_entry", "funding_entry",
+    "hour_utc_entry", "dow_entry", "n_open_before",
+    "signal_price", "signal_strength", "signal_reason", "normalized_mom",
+    "vol_ratio", "sl_pct_planned", "fill_slippage_pct",
+    "kronos_pred_fav", "kronos_ts",
+    "ml_signal_id", "ml_risk_mult", "ml_win_prob", "ml_gate_action",
+    "ml_sl_atr_mult", "ml_trail_mult",
+    "mfe", "mae", "sl_moves", "settings_entry",
+)
+
+
 class LiveLogger:
     """
     Session-scoped logger. One instance per bot run.
@@ -368,6 +385,12 @@ class LiveLogger:
             "hwm":                   round(float(position.get("hwm", 0.0) or 0.0), 6),
             "exit_source":           position.get("exit_source", "bot"),
         }
+        # Full entry/exit context stamped by live_scanner (_stamp_entry_context /
+        # _stamp_exit_context). Copied when present so older positions resumed
+        # from disk without these keys still log cleanly.
+        for k in _CONTEXT_KEYS:
+            if k in position:
+                record[k] = position[k]
 
         # 1. Strategy file — append record (strict, crash-safe)
         _append_strategy_record(strategy, record)

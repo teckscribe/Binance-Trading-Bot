@@ -47,6 +47,7 @@ import time
 import signal
 import logging
 from datetime import datetime, timezone
+import pandas as pd
 from dotenv import load_dotenv
 
 # ── Load .env before any module imports that read env vars ────────────────────
@@ -481,13 +482,113 @@ signal.signal(signal.SIGINT,  _handle_sigterm)
 # Position management
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _inject_duration_min(pos: dict) -> None:
+# ─────────────────────────────────────────────────────────────────────────────
+# Trade context capture
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Everything known about a trade at entry and at exit is stamped onto the
+# position dict, so the ledger (live_logger.log_exit), the ML outcome row and
+# the dashboard all carry it. Before this, the ledger had no regime at all and
+# the ML log only had the entry regime, which made "how does CSM do in
+# BEAR_TREND" a reconstruction job from REGIME_CHANGE events.
+
+# Latest regime dict from classify_regime(); refreshed every full cycle so the
+# exit path can stamp the regime in force when a trade closes.
+_current_regime: dict = {}
+
+# Settings that shape a trade, snapshotted at entry so trades stay comparable
+# across config changes.
+_ENTRY_SETTINGS_KEYS = (
+    "GLOBAL_LEVERAGE", "MAX_LEVERAGED_LOSS_PCT", "MIN_STRENGTH", "MAX_CONCURRENT",
+    "MAX_PER_STRATEGY", "KRONOS_GATE", "KRONOS_PF_THR",
+    "CSM_MOM_LO", "CSM_MOM_HI", "CSM_SL_ATR_LONG", "CSM_SL_ATR_SHORT",
+    "CSM_TP_ATR_LONG", "CSM_TP_ATR_SHORT", "CSM_PROFIT_LADDER", "CSM_MAX_HOLD_MIN",
+    "NASOS_SL_MODE", "NASOS_SL_FLAT", "NASOS_TP_ATR",
+)
+
+
+def _stamp_entry_context(pos: dict, sig: dict, size: dict, regime: dict,
+                         regime_age_min: float, ml_adj: dict, liq_price: float,
+                         n_open_before: int) -> None:
+    """Record the full decision context on the position at open time."""
+    try:
+        now = datetime.now(timezone.utc)
+        sig_px = float(sig.get("entry_price") or 0.0)
+        fill   = float(pos.get("entry_price") or 0.0)
+        sign   = 1.0 if pos.get("direction") == "LONG" else -1.0
+        pos.update({
+            # market context
+            "regime_entry":         regime.get("regime"),
+            "regime_age_min_entry": round(float(regime_age_min), 1),
+            "btc_price_entry":      regime.get("btc_price"),
+            "btc_trend_entry":      regime.get("btc_trend"),
+            "eth_trend_entry":      regime.get("eth_trend"),
+            "sol_trend_entry":      regime.get("sol_trend"),
+            "funding_entry":        regime.get("funding"),
+            "hour_utc_entry":       now.hour,
+            "dow_entry":            now.weekday(),
+            "n_open_before":        n_open_before,
+            # the signal as the strategy produced it
+            "signal_price":         sig_px,
+            "signal_strength":      sig.get("strength"),
+            "signal_reason":        sig.get("reason"),
+            "normalized_mom":       sig.get("normalized_mom"),
+            "vol_ratio":            sig.get("vol_ratio"),
+            "sl_pct_planned":       size.get("sl_pct"),
+            # adverse fill vs the signal price, as a fraction (positive = worse)
+            "fill_slippage_pct":    round(sign * (fill - sig_px) / sig_px, 6) if sig_px > 0 else None,
+            "liq_price":            liq_price,
+            # Kronos
+            "kronos_pred_fav":      sig.get("kronos_pred_fav"),
+            "kronos_ts":            sig.get("kronos_ts"),
+            # ML engine
+            "ml_risk_mult":         ml_adj.get("risk_mult"),
+            "ml_win_prob":          ml_adj.get("win_prob"),
+            "ml_gate_action":       ml_adj.get("gate_action"),
+            "ml_sl_atr_mult":       ml_adj.get("sl_atr_mult"),
+            # settings in force
+            "settings_entry":       {k: cfg.get(k) for k in _ENTRY_SETTINGS_KEYS},
+            # excursion tracking (updated every manage tick)
+            "mfe": 0.0, "mae": 0.0, "sl_moves": 0,
+        })
+    except Exception as exc:
+        log.warning(f"entry context stamp failed [{pos.get('symbol')}]: {exc}")
+
+
+def _track_excursion(pos: dict, df_1m) -> None:
+    """Peak favourable / adverse excursion since entry, as fractions of entry.
+
+    Uses the last bar's high/low, clamped to the close on the entry bar so a
+    pre-fill wick cannot leak in (same guard CSM uses for its HWM).
     """
-    Compute and write duration_min into the position dict before calling
-    ml_log_outcome(). The position dict never has this key at close time —
-    live_logger.log_exit() computes it internally but doesn't write it back.
-    Without this, all ML outcome records have duration_min=0, which breaks
-    Phase 3's trail multiplier logic (median winner duration → trail sizing).
+    try:
+        bar   = df_1m.iloc[-1]
+        entry = float(pos["entry_price"])
+        close = float(bar["close"]); hi = float(bar["high"]); lo = float(bar["low"])
+        try:
+            bar_ts = pd.to_datetime(bar["timestamp"] if "timestamp" in bar else bar.name, utc=True)
+            if bar_ts <= pd.to_datetime(pos["entry_time"], utc=True):
+                hi = lo = close
+        except Exception:
+            pass
+        if pos.get("direction") == "LONG":
+            fav, adv = (hi - entry) / entry, (entry - lo) / entry
+        else:
+            fav, adv = (entry - lo) / entry, (hi - entry) / entry
+        pos["mfe"] = round(max(float(pos.get("mfe") or 0.0), fav), 6)
+        pos["mae"] = round(max(float(pos.get("mae") or 0.0), adv), 6)
+    except Exception:
+        pass
+
+
+def _stamp_exit_context(pos: dict) -> None:
+    """
+    Write duration_min and the exit-side context into the position dict
+    before log_exit() / ml_log_outcome() read it. Called on EVERY close path.
+
+    duration_min: the dict never had this key at close time — log_exit()
+    computed it internally without writing it back, so ML outcome rows had
+    duration_min=0, which broke Phase 3's trail sizing.
     """
     try:
         entry_t  = datetime.fromisoformat(pos["entry_time"])
@@ -496,6 +597,20 @@ def _inject_duration_min(pos: dict) -> None:
         pos["duration_min"] = round((exit_t - entry_t).total_seconds() / 60, 1)
     except Exception:
         pos.setdefault("duration_min", 0.0)
+    try:
+        pos.setdefault("exit_time", datetime.now(timezone.utc).isoformat())
+        pos["regime_exit"]   = _current_regime.get("regime")
+        pos["btc_price_exit"] = _current_regime.get("btc_price")
+        pos.setdefault("mfe", round(float(pos.get("hwm") or 0.0), 6))
+        pos.setdefault("mae", 0.0)
+        pos.setdefault("sl_moves", 0)
+        pos["regime_changed_in_trade"] = (
+            pos.get("regime_entry") is not None
+            and pos.get("regime_exit") is not None
+            and pos["regime_entry"] != pos["regime_exit"]
+        )
+    except Exception as exc:
+        log.warning(f"exit context stamp failed [{pos.get('symbol')}]: {exc}")
 
 
 def _book_realized_pnl(pos: dict) -> None:
@@ -699,7 +814,7 @@ def _positions_view(active: list, symbol_data: dict) -> list:
 
     Both fields are otherwise dead on an OPEN position: pnl_equity_pct is set
     to 0.0 by open_position() and only written again by close_position(), and
-    duration_min is only written by _inject_duration_min() on the close paths.
+    duration_min is only written by _stamp_exit_context() on the close paths.
     The dashboard therefore showed 0.00% / 0 min for the whole life of a trade.
 
     Returns copies — the real position dicts are never mutated, so nothing here
@@ -778,6 +893,7 @@ def _manage_positions(
             continue
         # Reset failure counter on success
         pos.pop(f"_data_fail_{sym}", None)
+        _track_excursion(pos, df_1m)
 
         # ── Hard leveraged-loss ceiling ──────────────────────────────────────
         # Closes the position the moment its ROI (price move x leverage — the
@@ -812,7 +928,7 @@ def _manage_positions(
                         # what writes it. Called after them, every exit notification
                         # reported "Duration: 0.0 min" while the web ledger (which
                         # recomputes it internally) showed the true value.
-                        _inject_duration_min(pos)
+                        _stamp_exit_context(pos)
                         logger.log_exit(pos)
                         notify_exit(pos, TRADE_MODE)
                         _book_realized_pnl(pos)
@@ -901,6 +1017,7 @@ def _manage_positions(
         if not result.get("exit"):
             _sl_after = float(pos.get("sl_price") or 0.0)
             if _sl_after > 0 and _sl_after != _sl_before:
+                pos["sl_moves"] = int(pos.get("sl_moves", 0)) + 1
                 try:
                     update_stop_order(pos, _sl_after)
                 except Exception as exc:
@@ -919,7 +1036,7 @@ def _manage_positions(
             # what writes it. Called after them, every exit notification
             # reported "Duration: 0.0 min" while the web ledger (which
             # recomputes it internally) showed the true value.
-            _inject_duration_min(pos)
+            _stamp_exit_context(pos)
             logger.log_exit(pos)
             notify_exit(pos, TRADE_MODE)
             _book_realized_pnl(pos)
@@ -969,7 +1086,7 @@ def _force_close_all(
             # what writes it. Called after them, every exit notification
             # reported "Duration: 0.0 min" while the web ledger (which
             # recomputes it internally) showed the true value.
-            _inject_duration_min(pos)
+            _stamp_exit_context(pos)
             logger.log_exit(pos)
             notify_exit(pos, TRADE_MODE)
             _book_realized_pnl(pos)
@@ -1395,6 +1512,7 @@ def _execute_entries(
         # (Previously the dry-run branch only logged a line, so no position was
         # ever registered: the duplicate-symbol guard never tripped and the same
         # signal re-fired every cycle, producing no P&L to evaluate.)
+        n_open_before = live.n_open()
         live_pos = live.open_position(sig, size)
         if live_pos:
             # Commit ML signal to JSONL ONLY after open succeeds — prevents
@@ -1403,6 +1521,8 @@ def _execute_entries(
             # Store ML metadata on position for outcome logging + manage()
             live_pos["ml_signal_id"]  = ml_adj.get("signal_id", "")
             live_pos["ml_trail_mult"] = ml_adj.get("trail_atr_mult")
+            _stamp_entry_context(live_pos, sig, size, regime, regime_age_min,
+                                 ml_adj, liq_price, n_open_before)
             logger.log_signal(
                 symbol      = sig["symbol"],
                 strategy    = sig["strategy"],
@@ -1438,7 +1558,7 @@ def main() -> None:
     # only ever fired during the first MIN_REGIME_AGE_MINUTES of process
     # life and never after an actual regime change, and ml_engine was
     # trained on process uptime under the name 'regime_age_min'.
-    global _shutdown, ACCOUNT_EQUITY, _regime_changed_at
+    global _shutdown, ACCOUNT_EQUITY, _regime_changed_at, _current_regime
 
     log.info("=" * 60)
     log.info("  Binance USDM Futures Bot — Starting")
@@ -1570,6 +1690,7 @@ def main() -> None:
         eth_1h = btc_ref.get("eth_1h"),
         sol_1h = btc_ref.get("sol_1h"),
     )
+    _current_regime    = regime
     current_regime     = regime.get("regime", "RANGING")
     _regime_changed_at = datetime.now(timezone.utc)
 
@@ -1716,6 +1837,7 @@ def main() -> None:
                     eth_1h = btc_ref.get("eth_1h"),
                     sol_1h = btc_ref.get("sol_1h"),
                 )
+                _current_regime = regime
                 new_regime = regime.get("regime", "RANGING")
 
                 # LLM regime override removed 2026-08-11 — see docs/LLM_REMOVED.md.
@@ -1761,7 +1883,7 @@ def main() -> None:
                                         # what writes it. Called after them, every exit notification
                                         # reported "Duration: 0.0 min" while the web ledger (which
                                         # recomputes it internally) showed the true value.
-                                        _inject_duration_min(pos)
+                                        _stamp_exit_context(pos)
                                         logger.log_exit(pos)
                                         notify_exit(pos, TRADE_MODE)
                                         _book_realized_pnl(pos)
@@ -1862,7 +1984,7 @@ def main() -> None:
                             # what writes it. Called after them, every exit notification
                             # reported "Duration: 0.0 min" while the web ledger (which
                             # recomputes it internally) showed the true value.
-                            _inject_duration_min(_sq_pos)
+                            _stamp_exit_context(_sq_pos)
                             logger.log_exit(_sq_pos)
                             notify_exit(_sq_pos, TRADE_MODE)
                             _book_realized_pnl(_sq_pos)
@@ -1888,7 +2010,7 @@ def main() -> None:
                 # what writes it. Called after them, every exit notification
                 # reported "Duration: 0.0 min" while the web ledger (which
                 # recomputes it internally) showed the true value.
-                _inject_duration_min(pos)
+                _stamp_exit_context(pos)
                 logger.log_exit(pos)
                 notify_exit(pos, TRADE_MODE)
                 _book_realized_pnl(pos)

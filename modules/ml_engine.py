@@ -479,6 +479,17 @@ def log_outcome(position: dict) -> None:
         "exit_reason":    position.get("exit_reason", ""),
         "be_triggered":   position.get("be_hit", position.get("be_active", False)),
         "hwm":            round(float(position.get("hwm", 0.0) or 0.0), 6),
+        # exit-side context (stamped by live_scanner._stamp_exit_context)
+        "exit_source":    position.get("exit_source", "bot"),
+        "regime_exit":    position.get("regime_exit"),
+        "regime_entry":   position.get("regime_entry"),
+        "mfe":            position.get("mfe"),
+        "mae":            position.get("mae"),
+        "sl_moves":       position.get("sl_moves"),
+        "fee_usdt":       position.get("fee_usdt"),
+        "pnl_usdt_net":   position.get("pnl_usdt_net"),
+        "fill_slippage_pct": position.get("fill_slippage_pct"),
+        "kronos_pred_fav": position.get("kronos_pred_fav"),
     }
     try:
         _append_jsonl(_OUTCOMES_PATH, record)
