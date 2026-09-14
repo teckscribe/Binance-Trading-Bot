@@ -149,7 +149,22 @@ def progress() -> dict:
 
     k_ok = [r for r in kscores if "err" not in r and r.get("entry_price")]
     k_err = len(kscores) - len(k_ok)
-    k_gate = sum(1 for r in k_ok if r.get("would_gate"))
+    # "Would block" is derived here from pred_fav at the LIVE threshold, not
+    # read from the rows: the worker stamps no threshold, so this count always
+    # agrees with what the gate actually does (and re-reads old rows the same
+    # way when the threshold changes).
+    gate = {"mode": "unknown", "threshold": None, "wait_sec": None}
+    try:
+        sys.path.insert(0, _ROOT)
+        from modules import settings_manager as cfg
+        gate = {"mode": cfg.get("KRONOS_GATE"), "threshold": cfg.get("KRONOS_PF_THR"),
+                "wait_sec": cfg.get("KRONOS_GATE_WAIT_SEC")}
+    except Exception:
+        pass
+    thr = gate["threshold"]
+    k_gate = (sum(1 for r in k_ok
+                  if r.get("pred_fav") is not None and float(r["pred_fav"]) >= thr)
+              if thr is not None else 0)
     # rows without a strategy tag predate NASOS queueing and are CSM
     k_by = {s: [r for r in k_ok if r.get("strategy", "CSM") == s] for s in SHADOW_STRATEGIES}
     k_matched = _match_kronos(trades, k_by["CSM"])
@@ -179,15 +194,6 @@ def progress() -> dict:
         if extra:
             d.update(extra)
         return d
-
-    gate = {"mode": "unknown", "threshold": None, "wait_sec": None}
-    try:
-        sys.path.insert(0, _ROOT)
-        from modules import settings_manager as cfg
-        gate = {"mode": cfg.get("KRONOS_GATE"), "threshold": cfg.get("KRONOS_PF_THR"),
-                "wait_sec": cfg.get("KRONOS_GATE_WAIT_SEC")}
-    except Exception:
-        pass
 
     return {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -1,18 +1,22 @@
 """
 kronos/shadow_worker.py  --  runs in kronos/venv, OUT of the bot's process.
 
-Consumes the shadow queue (logs/shadow_requests.jsonl) that the bot appends CSM
-candidates to, scores each with Kronos-small, and records what it WOULD have
-gated -- without ever affecting a trade (observe-only).
+Consumes the shadow queue (logs/shadow_requests.jsonl) that the bot appends
+candidates to, scores each with Kronos-small, and records the raw scores --
+without ever affecting a trade (observe-only).
 
 For each queued candidate it fetches that symbol's recent 15m klines from
 Binance USDM public API (no auth), builds the LEAK-FREE context (bars whose
 close <= the candidate's timestamp), scores, and appends to
 logs/shadow_scores.jsonl:
 
-    {...request..., dir_ret, pred_fav, pred_adv, would_gate, scored_at}
+    {...request..., dir_ret, pred_fav, pred_adv, scored_at}
 
-would_gate = pred_fav >= KRONOS_PF_THR (default 0.020, the validated gate).
+The worker holds NO threshold. The live gate compares pred_fav against the
+hot KRONOS_PF_THR setting in the scanner, and kronos/progress.py derives the
+"would block" count from pred_fav at that same setting, so there is exactly
+one copy of the number. (Rows written before 2026-09-14 also carry a
+would_gate flag stamped at the then-fixed 0.020; nothing reads it any more.)
 
 Robust by construction: every candidate is scored in its own try/except; a bad
 symbol or a network blip is logged as an error row and the loop continues.  It
@@ -33,7 +37,6 @@ LOGDIR = os.path.join(_HERE, "logs")
 REQ = os.path.join(LOGDIR, "shadow_requests.jsonl")
 OUT = os.path.join(LOGDIR, "shadow_scores.jsonl")
 STATE = os.path.join(LOGDIR, ".shadow_offset")
-THR = float(os.getenv("KRONOS_PF_THR", "0.020"))
 POLL = float(os.getenv("KRONOS_POLL_SEC", "5"))
 KLINES = "https://fapi.binance.com/fapi/v1/klines"
 _Q = pd.Timedelta(minutes=15)
@@ -94,13 +97,12 @@ def score_request(sc, req):
     s = sc.score_window(ctx, req["direction"])
     if s is None:
         return {**req, "err": "insufficient_context", "scored_at": datetime.now(timezone.utc).isoformat()}
-    return {**req, **s, "would_gate": bool(s["pred_fav"] >= THR),
-            "scored_at": datetime.now(timezone.utc).isoformat()}
+    return {**req, **s, "scored_at": datetime.now(timezone.utc).isoformat()}
 
 
 def main():
     os.makedirs(LOGDIR, exist_ok=True)
-    print(f"[shadow] loading Kronos-small (THR={THR}) ...", flush=True)
+    print("[shadow] loading Kronos-small ...", flush=True)
     sc = KronosScorer()
     print(f"[shadow] ready. polling {REQ} every {POLL}s", flush=True)
     off = _read_offset()
@@ -125,9 +127,8 @@ def main():
                                 rec = {"raw": line[:200], "err": str(exc)[:160],
                                        "scored_at": datetime.now(timezone.utc).isoformat()}
                             _append(rec)
-                            tag = rec.get("would_gate")
                             print(f"[shadow] {rec.get('symbol','?')} {rec.get('direction','?')} "
-                                  f"pred_fav={rec.get('pred_fav')} gate={tag} err={rec.get('err','')}", flush=True)
+                                  f"pred_fav={rec.get('pred_fav')} err={rec.get('err','')}", flush=True)
                     off = f.tell()
                 _write_offset(off)
         except Exception as exc:

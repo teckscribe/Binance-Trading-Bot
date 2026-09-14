@@ -100,7 +100,7 @@ def build():
                 if bestkey is None or key < bestkey:
                     best, bestkey = c, key
         if best is not None:
-            row["kronos"] = {k: best.get(k) for k in KFEATS + ["would_gate"]}
+            row["kronos"] = {k: best.get(k) for k in KFEATS}
             matched += 1
     return labelled, matched
 
