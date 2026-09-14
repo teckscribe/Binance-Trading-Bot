@@ -1,17 +1,12 @@
 {
   "CSM": {
     "disabled": false,
-    "set_at": "2026-09-11T17:59:00.000000+00:00",
-    "reason": "re-enabled after audit cross-check"
+    "set_at": "2026-09-14T05:05:12.881682+00:00",
+    "reason": "manual enable"
   },
   "NASOS_V4": {
     "disabled": false,
-    "set_at": "2026-09-11T17:59:00.000000+00:00",
-    "reason": "re-enabled after audit cross-check"
-  },
-  "ELLIOT_V8": {
-    "disabled": false,
-    "set_at": "2026-09-11T17:59:00.000000+00:00",
-    "reason": "re-enabled after audit cross-check"
+    "set_at": "2026-09-14T05:05:14.192505+00:00",
+    "reason": "manual enable"
   }
 }

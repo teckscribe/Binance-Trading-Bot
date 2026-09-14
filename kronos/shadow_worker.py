@@ -104,6 +104,7 @@ def main():
     os.makedirs(LOGDIR, exist_ok=True)
     print("[shadow] loading Kronos-small ...", flush=True)
     sc = KronosScorer()
+    print(f"[shadow] weights: model@{sc.revision['model'][:12]} tokenizer@{sc.revision['tokenizer'][:12]}", flush=True)
     print(f"[shadow] ready. polling {REQ} every {POLL}s", flush=True)
     off = _read_offset()
     while True:

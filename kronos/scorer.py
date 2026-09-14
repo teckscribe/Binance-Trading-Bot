@@ -33,6 +33,11 @@ _Q = pd.Timedelta(minutes=15)
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+# Upstream HF commits of the validated weights (see the note in __init__).
+MODEL_REVISION     = "901c26c1332695a2a8f243eb2f37243a37bea320"   # NeoQuasar/Kronos-small
+TOKENIZER_REVISION = "0e0117387f39004a9016484a186a908917e22426"   # NeoQuasar/Kronos-Tokenizer-base
+
+
 class KronosScorer:
     def __init__(self, lb=_LB_DEFAULT, pl=_PL_DEFAULT, device="cpu",
                  threads=None, src=None, tokenizer=None, model=None):
@@ -45,9 +50,18 @@ class KronosScorer:
         from model import Kronos, KronosTokenizer, KronosPredictor
         tok_id = tokenizer or os.getenv("KRONOS_TOKENIZER", "NeoQuasar/Kronos-Tokenizer-base")
         mdl_id = model or os.getenv("KRONOS_MODEL", "NeoQuasar/Kronos-small")
+        # Pinned to the exact upstream commits the gate was validated on
+        # (EXPERIMENT_LOG §0.4, §0.5.10; both published 2025-09-09). Unpinned,
+        # from_pretrained() resolves `main` on every start and would silently
+        # adopt new weights, invalidating KRONOS_PF_THR without any trace in the
+        # logs. A new Kronos release is a shadow re-validation, not a restart.
+        # Set KRONOS_REVISION / KRONOS_TOKENIZER_REVISION to test another one.
+        tok_rev = os.getenv("KRONOS_TOKENIZER_REVISION", TOKENIZER_REVISION)
+        mdl_rev = os.getenv("KRONOS_REVISION", MODEL_REVISION)
         self.lb, self.pl = lb, pl
-        self._tok = KronosTokenizer.from_pretrained(tok_id)
-        self._mdl = Kronos.from_pretrained(mdl_id)
+        self._tok = KronosTokenizer.from_pretrained(tok_id, revision=tok_rev)
+        self._mdl = Kronos.from_pretrained(mdl_id, revision=mdl_rev)
+        self.revision = {"model": mdl_rev, "tokenizer": tok_rev}
         # Disable dropout layers for deterministic inference scoring
         self._tok.eval()
         self._mdl.eval()
