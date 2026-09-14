@@ -375,7 +375,7 @@ class LiveLogger:
             "leverage":              position.get("leverage", 1),
             "notional":              position.get("notional", 0.0),
             "duration_min":          duration,
-            # Production strategies set 'be_hit'; only trend_pullback (retired)
+            # Production strategies set 'be_hit'; only trend_pullback (deleted 2026-09-14)
             # sets 'be_active'. Reading just 'be_active' left this field False
             # in every record, so the logs could not distinguish a trade that
             # reached breakeven from one stopped out cold.

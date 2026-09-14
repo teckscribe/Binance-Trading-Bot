@@ -35,7 +35,6 @@ logging.basicConfig(level=logging.WARNING)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from modules.strategies.freqtrade_port_nasos  import NASOSv4Port
-from modules.strategies.freqtrade_port_ichi   import IchiV1Port
 
 # ── Config ──────────────────────────────────────────────────────────────────
 DATA_DIR        = os.path.join("data", "freqtrade_bt")
@@ -65,7 +64,6 @@ def fetch_top_futures_symbols(n=100):
 
 STRATEGY_CLASSES = {
     "NASOS_V4":   NASOSv4Port,
-    "ICHI_V1":    IchiV1Port,
 }
 
 TIER = {k: "Freqtrade" for k in STRATEGY_CLASSES}
@@ -551,7 +549,6 @@ def main():
     print("  - These strategies are LONG-only dip-buyers, designed for volatile markets")
     print("  - Entry requires RSI_fast < 35 + price below EMA offset — very selective")
     print("  - Results are in-sample; do not tune on them")
-    print("  - ichiV1 uses Ichimoku cloud + trend fan — different entry logic")
     print("=" * 100)
 
 

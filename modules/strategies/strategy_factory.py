@@ -2,7 +2,7 @@
 strategies/strategy_factory.py
 Instantiate and return the production strategy objects.
 
-Production set (3), listed in scan-priority order:
+Production set (2), listed in scan-priority order:
     CSM        - Cross-Sectional Momentum  (4-5x ATR(1h) 24h move, long + short)
     NASOS_V4   - NASOS V4 Dip-Buy         (EWO + RSI dip-buy on 5m)
 
@@ -18,27 +18,15 @@ DELETED 2026-08-19: EI3_V2, VRP, LIQ.
 
 DELETED 2026-08-11: OIB, WKD. Source files removed.
 
-Files still present but NOT in production:
-  trend_pullback.py   - removed 2026-08-04. Kept for backtest_optimizer.
-  funding_fade_v2.py  - removed 2026-08-04. Same reason.
-  grid_strategy.py    - see GRID note below.
-
-GRID (Neutral Grid Trading) is a special case: it is NOT in _ALL_STRATEGIES so
-it can never open a position, but live_scanner.py still calls get_grid() to
-dissolve any pre-existing grid positions on a regime change.
+DELETED 2026-09-14: TP (trend_pullback), FF_V2 (funding_fade_v2), GRID,
+  ICHI_V1. All four had been out of production since August and were kept
+  only for backtest_optimizer / the legacy grid-dissolve path; no GRID
+  position has existed for weeks, so the scaffolding went with them.
 """
 
 from modules.strategies.base_strategy               import BaseStrategy
 from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
 from modules.strategies.freqtrade_port_nasos        import NASOSv4Port
-
-# Retained only so live_scanner can dissolve legacy grid positions on a regime
-# change. GRID is not in _ALL_STRATEGIES and cannot open new positions.
-try:
-    from modules.strategies.grid_strategy import GridStrategy
-    _GRID_INSTANCE = GridStrategy()
-except ImportError:
-    _GRID_INSTANCE = None
 
 _ALL_STRATEGIES = [
     CrossSectionalMomentum(),
@@ -58,9 +46,6 @@ class StrategyFactory:
     def get(strategy_id: str) -> BaseStrategy | None:
         return _STRATEGY_MAP.get(strategy_id)
 
-    @staticmethod
-    def get_grid():
-        return _GRID_INSTANCE
 
     @staticmethod
     def get_permitted(regime: dict, regime_permissions: dict) -> list[BaseStrategy]:

@@ -30,7 +30,6 @@ Exit dict schema (returned by manage()):
 """
 
 from abc import ABC, abstractmethod
-import time
 import logging
 import pandas as pd
 
@@ -464,88 +463,6 @@ def compute_adx(df: pd.DataFrame, period: int = 14) -> float:
     except Exception as exc:
         _log.debug(f"compute_adx failed: {exc}")
         return 0.0
-
-
-# ─── Open Interest trend cache ────────────────────────────────────────────────
-# Tracks OI per symbol across consecutive scan() calls.
-# Used to determine whether OI is rising (new positions entering)
-# or falling (positions closing) — which tells us if a price move
-# is driven by real conviction or just existing position unwinding.
-#
-# Cache entry: {symbol: (timestamp_float, oi_value_float)}
-# TTL: 2 minutes — balances freshness vs API call count.
-# At 160 symbols, only symbols that reach the final OI check are queried
-# (~5–10 per cycle), not all 160.
-
-_OI_CACHE_TTL = 120.0   # seconds
-_oi_cache: dict[str, tuple[float, float]] = {}
-
-
-def get_oi_trend(symbol: str, direction: str) -> str:
-    """
-    Determine whether Open Interest is rising or falling for a symbol,
-    and whether that confirms or contradicts the intended trade direction.
-
-    OI interpretation for volatile crypto:
-      Price rising + OI rising  → real longs entering → CONFIRMS LONG
-      Price rising + OI falling → shorts covering     → WEAK (no new buyers)
-      Price falling + OI rising → real shorts entering → CONFIRMS SHORT
-      Price falling + OI falling→ longs liquidating   → WEAK (may bounce)
-
-    Since we only check this after price/EMA/RSI/MACD already confirm
-    direction, we simplify:
-      OI rising  → "RISING"   — new money entering, confirms the move
-      OI flat    → "FLAT"     — inconclusive, allow trade (don't over-filter)
-      OI falling → "FALLING"  — positions closing, move may lack follow-through
-      Unknown    → "UNKNOWN"  — API failed, allow trade (fail-open)
-
-    Args:
-        symbol    : e.g. 'BTCUSDT'
-        direction : 'LONG' or 'SHORT'
-
-    Returns:
-        'RISING' | 'FLAT' | 'FALLING' | 'UNKNOWN'
-    """
-    # Lazy import to avoid circular dependency — data_feed is a module sibling
-    try:
-        from modules.data_feed import fetch_open_interest
-    except ImportError:
-        try:
-            from data_feed import fetch_open_interest
-        except ImportError:
-            return "UNKNOWN"
-
-    now = time.monotonic()
-    cached = _oi_cache.get(symbol)
-
-    # Fetch fresh OI
-    oi_now = fetch_open_interest(symbol)
-    if oi_now is None:
-        return "UNKNOWN"
-
-    if cached is None:
-        # First time seeing this symbol — store and allow trade
-        _oi_cache[symbol] = (now, oi_now)
-        return "UNKNOWN"
-
-    cached_ts, oi_prev = cached
-    _oi_cache[symbol] = (now, oi_now)   # always update cache
-
-    # If cached value is stale (> TTL), treat as fresh baseline
-    if now - cached_ts > _OI_CACHE_TTL * 3:
-        return "UNKNOWN"
-
-    # OI change threshold: 0.3% change to distinguish signal from noise
-    if oi_prev <= 0:
-        return "UNKNOWN"
-
-    change_pct = (oi_now - oi_prev) / oi_prev * 100
-
-    if change_pct > 0.3:
-        return "RISING"
-    elif change_pct < -0.3:
-        return "FALLING"
-    return "FLAT"
 
 
 def no_exit() -> dict:

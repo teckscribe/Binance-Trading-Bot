@@ -57,9 +57,6 @@ TRACKED = [
     "modules/strategies/strategy_factory.py",
     "modules/strategies/cross_sectional_momentum.py",
     "modules/strategies/freqtrade_port_nasos.py",
-    "modules/strategies/grid_strategy.py",
-    "modules/strategies/trend_pullback.py",
-    "modules/strategies/funding_fade_v2.py",
 ]
 
 # Deliberately NOT tracked, because the replay must own them:

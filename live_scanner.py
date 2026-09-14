@@ -1859,48 +1859,6 @@ def main() -> None:
                     current_regime     = new_regime
                     _regime_changed_at = datetime.now(timezone.utc)
 
-                    # Dissolve grid positions when leaving RANGING
-                    grid = StrategyFactory.get_grid()
-                    if current_regime != "RANGING" and grid is not None:
-                        dissolved = grid.dissolve_all()
-                        if dissolved:
-                            log.warning(
-                                f"Grid dissolved on regime change — "
-                                f"symbols: {dissolved}"
-                            )
-                            # Close live grid positions
-                            for pos in list(live.active):
-                                if (pos.get("strategy") == "GRID"
-                                        and pos["symbol"] in dissolved):
-                                    # Use last known market price; fall back to entry
-                                    sym_data = symbol_data.get(pos["symbol"])
-                                    if (sym_data and sym_data[0] is not None
-                                            and not sym_data[0].empty):
-                                        ep = float(sym_data[0]["close"].iloc[-1])
-                                    else:
-                                        ep = pos["entry_price"]
-                                    ok = live.close_position(
-                                        pos, ep, "GRID_REGIME_CHANGE",
-                                        account_equity=ACCOUNT_EQUITY,
-                                    )
-                                    if ok is True:
-                                        # BEFORE log_exit/notify_exit: both read duration_min, and this is
-                                        # what writes it. Called after them, every exit notification
-                                        # reported "Duration: 0.0 min" while the web ledger (which
-                                        # recomputes it internally) showed the true value.
-                                        _stamp_exit_context(pos)
-                                        logger.log_exit(pos)
-                                        notify_exit(pos, TRADE_MODE)
-                                        _book_realized_pnl(pos)
-                                        record_trade_pnl(
-                                            pos.get("pnl_equity_pct", 0.0)
-                                        )
-                                        ml_log_outcome(pos)
-                                    elif ok is False:
-                                        notify_error(
-                                            f"❗ GRID close failed on regime change: "
-                                            f"{pos['symbol']} — check Binance manually"
-                                        )
 
             # ── 3. Fetch market data ──────────────────────────────────────────
             open_syms = [p["symbol"] for p in live.active]

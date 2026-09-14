@@ -82,9 +82,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-from modules.strategies.trend_pullback            import TrendPullback
 from modules.strategies.cross_sectional_momentum  import CrossSectionalMomentum
-from modules.strategies.funding_fade_v2           import FundingFadeV2
 from modules.strategies.freqtrade_port_nasos       import NASOSv4Port
 
 from modules.risk_engine import (
@@ -104,7 +102,7 @@ INITIAL_CAPITAL = 20.0
 LEVERAGE        = 5
 TAKER_FEE       = 0.0004
 ROUND_TRIP_FEE  = TAKER_FEE * 2        # 0.08% of notional
-WARMUP_BARS     = 200                  # FF_V2 needs a 200-period EMA
+WARMUP_BARS     = 200                  # sized for FF_V2's 200-EMA originally; harmless
 SPLIT_THRESHOLD = 0.35                 # single-bar move flagged as corporate action
 
 # ── Slippage ─────────────────────────────────────────────────────────────────
@@ -154,15 +152,11 @@ LOOKAHEAD_1H    = os.getenv("BT_LOOKAHEAD_1H", "false").lower() == "true"
 # longer be backtested even with --strategies. See strategy_factory.py.
 STRATEGY_CLASSES = {
     "CSM":   CrossSectionalMomentum,
-    "TP":    TrendPullback,
-    "FF_V2": FundingFadeV2,
     "NASOS_V4":   NASOSv4Port,
 }
 
 # Default to whatever the factory actually runs, so a backtest reflects
 # production unless you deliberately ask for more via --strategies.
-# (TP was removed from production on 2026-08-04 but kept being backtested
-# because this list was hardcoded — a 5th place the strategy set had drifted.)
 def _production_strategy_ids() -> list[str]:
     try:
         from modules.strategies.strategy_factory import StrategyFactory
@@ -177,15 +171,13 @@ def _production_strategy_ids() -> list[str]:
 PRODUCTION_IDS = _production_strategy_ids()
 
 STRATEGY_ORDER = PRODUCTION_IDS + [
-    s for s in ["CSM", "TP", "FF_V2"]
+    s for s in ["CSM"]
     if s not in PRODUCTION_IDS
 ]
 TIER = {"CSM": "Elite",
-        "TP": "Good", "FF_V2": "Good",
         "NASOS_V4": "FT"}
 
-MOCK_REGIME = {"CSM": "BULL_TREND", "TP": "BULL_TREND",
-               "FF_V2": "BULL_TREND",
+MOCK_REGIME = {"CSM": "BULL_TREND",
                "NASOS_V4": "BULL_TREND"}
 
 # Tokenised equities and leveraged ETFs on Binance USDM Futures. These only
