@@ -637,14 +637,6 @@ _SUBMENU_KEYBOARD = {
 }
 
 
-def _back_keyboard(parent: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⬅ Back", callback_data=parent)
-    ]])
-
-
-
-
 def _strategies_keyboard() -> InlineKeyboardMarkup:
     """Sub-menu: toggle each strategy on/off via runtime override."""
     try:

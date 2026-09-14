@@ -137,20 +137,6 @@ def _ensure_period_starts(margin_balance: float) -> dict:
     return cache
 
 
-def reset_day_start() -> None:
-    """Force a re-snapshot of day_start_equity on next call. Used by /reset."""
-    cache = _load_cache()
-    cache["day_start"] = 0.0
-    _save_cache(cache)
-
-
-def reset_week_start() -> None:
-    """Force a re-snapshot of week_start_equity on next call."""
-    cache = _load_cache()
-    cache["week_start"] = 0.0
-    _save_cache(cache)
-
-
 # ────────────────────────────────────────────────────────────────────────────
 # Public API
 # ────────────────────────────────────────────────────────────────────────────

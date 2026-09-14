@@ -73,19 +73,6 @@ def _send_embed(embed: dict) -> bool:
         return False
 
 
-def _send_text(content: str) -> bool:
-    """POST plain text to the Discord webhook."""
-    if not WEBHOOK_URL:
-        return False
-    try:
-        resp = requests.post(WEBHOOK_URL, json={"content": content}, timeout=10)
-        resp.raise_for_status()
-        return True
-    except Exception as exc:
-        print(f"Discord send failed: {exc}")
-        return False
-
-
 # ── Public notification functions (same signatures as telegram_notifier.py) ───
 
 def notify_startup(

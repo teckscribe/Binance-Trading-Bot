@@ -7,10 +7,9 @@ LLM's only lever is the regime label.
   3. oracle              - perfect foresight per trade (unreachable ceiling)
 """
 import os, sys, glob, logging
-from collections import defaultdict
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # relocation-proof; was a hardcoded absolute path
 sys.path.insert(0, PROJECT); os.chdir(PROJECT)
-import pandas as pd, numpy as np, backtest_optimizer as bt
+import pandas as pd, backtest_optimizer as bt
 from modules.risk_engine import compute_position_size, max_total_margin_pct, max_concurrent
 MAX_TOTAL_MARGIN_PCT = max_total_margin_pct()
 MAX_CONCURRENT = max_concurrent()

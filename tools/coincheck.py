@@ -8,8 +8,8 @@ variant - an outcome comparison, not a labelling comparison.
 
 usage: coincheck.py <data_days> <window_days>
 """
-import os, sys, glob, json, bisect, logging
-from collections import defaultdict, Counter
+import os, sys, glob, bisect, logging
+from collections import Counter
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # relocation-proof; was a hardcoded absolute path
 sys.path.insert(0, PROJECT)
@@ -17,7 +17,7 @@ os.chdir(PROJECT)
 
 import pandas as pd
 import backtest_optimizer as bt
-from modules.regime_engine import (_coin_trend, _compute_adx, _decide_regime,
+from modules.regime_engine import (_coin_trend, _compute_adx,
     HYSTERESIS_PCT, SMA_PERIOD, MIN_BARS_NEEDED, ADX_REGIME_MIN,
     REGIME_STRATEGY_PERMISSIONS as PERM)
 

@@ -21,7 +21,7 @@ import backtest_optimizer as bt
 from modules.regime_engine import (
     _coin_trend, _compute_adx, _sma_slope_pct, _decide_regime,
     HYSTERESIS_PCT, SMA_PERIOD, MIN_BARS_NEEDED, ADX_REGIME_MIN,
-    FUNDING_EXTREME, TREND_MIN_DIST_PCT,
+    FUNDING_EXTREME,
 )
 
 DAYS = 90

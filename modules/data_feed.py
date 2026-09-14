@@ -165,21 +165,6 @@ def fetch_candles(symbol: str, timeframe: str = "1m", limit: int = 200) -> pd.Da
     return _to_dataframe(raw)
 
 
-def fetch_multi_timeframe(
-    symbol: str,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Fetch 1m, 15m, and 1h candles for one symbol.
-
-    Returns:
-        (df_1m, df_15m, df_1h) — each a DataFrame or empty on failure.
-    """
-    df_1m  = fetch_candles(symbol, "1m",  limit=200)
-    df_15m = fetch_candles(symbol, "15m", limit=200)
-    df_1h  = fetch_candles(symbol, "1h",  limit=200)
-    return df_1m, df_15m, df_1h
-
-
 def fetch_funding_rate(symbol: str) -> float | None:
     """
     Fetch the current funding rate for a USDM Futures symbol.

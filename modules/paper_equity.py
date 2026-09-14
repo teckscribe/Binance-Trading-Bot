@@ -84,12 +84,6 @@ def _save(data: dict) -> None:
         log.warning(f"Could not persist paper equity: {exc}")
 
 
-def current_equity(starting: float) -> float:
-    """Simulated balance = starting equity + realized P&L. Never below zero."""
-    data = _load(starting)
-    return max(0.0, starting + float(data.get("realized_pnl_usdt", 0.0)))
-
-
 def record(starting: float, pnl_usdt_net: float) -> float:
     """
     Book a closed paper trade's net P&L and return the new simulated balance.

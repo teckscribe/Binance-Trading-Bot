@@ -196,10 +196,6 @@ def max_sl_pct() -> float:
 # It also fires BEFORE the strategy's stop in most configurations, which means
 # the strategy's own exit logic — breakeven, trailing, the CSM profit ladder —
 # never gets to run on losing trades.
-def max_trade_loss_pct() -> float:
-    return cfg.get("MAX_TRADE_LOSS_PCT")
-
-
 # Maximum SL distance used by ML P3 SL-override validation in live_scanner.py.
 # ML override is rejected if the resulting sl_pct exceeds this value — ensures
 # the ML-suggested SL doesn't widen beyond the widest per-strategy hard stop
@@ -463,7 +459,7 @@ def compute_liq_price(
 # Written to disk after every closed trade.
 # Survives bot restarts — loss caps remain active even after a crash + restart.
 
-import os, json
+import json
 from datetime import datetime, timezone
 
 _MODULE_DIR  = os.path.dirname(os.path.abspath(__file__))

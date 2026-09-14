@@ -35,7 +35,6 @@ watchlist/symbol_filter, a few per hour) are not gated; their weight still
 shows up in the header, so they are accounted for, just not throttled.
 """
 import logging
-import re
 import threading
 import time
 from urllib.parse import urlparse

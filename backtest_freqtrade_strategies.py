@@ -24,7 +24,6 @@ from functools import reduce
 
 import numpy as np
 import pandas as pd
-import pandas_ta as pta
 import requests
 
 warnings.filterwarnings("ignore", category=FutureWarning)

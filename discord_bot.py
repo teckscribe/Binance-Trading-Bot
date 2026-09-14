@@ -593,25 +593,6 @@ async def _send_analysis(interaction, msg: str, view=None):
             await interaction.followup.send(ch)
 
 
-class BlacklistAddModal(discord.ui.Modal, title="Add to Blacklist"):
-    coin = discord.ui.TextInput(label="Coin symbol (e.g. XLM)", placeholder="XLM", max_length=20)
-    strategy = discord.ui.TextInput(label="Strategy (optional, e.g. GRID)", required=False, max_length=20)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        # Defer then followup so the modal submit doesn't hit the 3s limit
-        await interaction.response.defer()
-        symbol = self.coin.value.strip().upper()
-        if not symbol.endswith("USDT"):
-            symbol += "USDT"
-        strat_list = [self.strategy.value.strip().upper()] if self.strategy.value.strip() else None
-        try:
-            from modules.blacklist import add
-            desc = add(symbol, strat_list)
-            await interaction.followup.send(f"🚫 {desc}", view=MainMenuView())
-        except Exception as exc:
-            await interaction.followup.send(f"❌ Add failed: {exc}", view=MainMenuView())
-
-
 class WatchlistAddModal(discord.ui.Modal, title="Add to Watchlist"):
     coin = discord.ui.TextInput(label="Coin symbol (e.g. SOL)", placeholder="SOL", max_length=20)
 

@@ -268,6 +268,3 @@ def get_top_symbols(force_refresh: bool = False) -> list[str]:
     return symbols
 
 
-def get_btc_symbol() -> str:
-    """Return the BTC perpetual symbol used as the market regime reference."""
-    return "BTCUSDT"

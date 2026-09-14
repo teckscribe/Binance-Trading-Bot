@@ -1564,7 +1564,7 @@ def main() -> None:
     # only ever fired during the first MIN_REGIME_AGE_MINUTES of process
     # life and never after an actual regime change, and ml_engine was
     # trained on process uptime under the name 'regime_age_min'.
-    global _shutdown, ACCOUNT_EQUITY, _regime_changed_at, _current_regime
+    global ACCOUNT_EQUITY, _regime_changed_at, _current_regime
 
     log.info("=" * 60)
     log.info("  Binance USDM Futures Bot — Starting")
@@ -1739,8 +1739,6 @@ def main() -> None:
         cycle        += 1
         t_start       = time.monotonic()
         now_utc       = datetime.now(timezone.utc)
-        has_open      = live.n_open() > 0
-
         # Pick up operator edits (dashboard / Telegram / Discord) for this
         # cycle. A change to the universe shape forces the hourly symbol
         # refresh below to run now rather than up to an hour later.

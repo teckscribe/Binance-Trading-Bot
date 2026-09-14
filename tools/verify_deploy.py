@@ -74,6 +74,7 @@ try:
         g = [s.STRATEGY_ID for s in StrategyFactory.get_permitted({"regime": r}, P)]
         print("         %-12s -> %s" % (r, g or "(none)"))
     from modules.order_engine import update_stop_order
+    assert callable(update_stop_order)
     ok("order_engine.update_stop_order present (Fix B)")
     import live_scanner as ls
     ok("live_scanner imports; MANAGE_ON_BAR_CLOSE=%s" % ls.MANAGE_ON_BAR_CLOSE)

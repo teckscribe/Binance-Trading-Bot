@@ -21,7 +21,7 @@ All leak-free: only positioning bars fully closed before the candidate time.
 
 Run:  kronos/venv/bin/python kronos/whale_worker.py   (systemd: whale-shadow)
 """
-import os, sys, json, time, urllib.request
+import os, json, time, urllib.request
 from datetime import datetime, timezone
 
 _HERE = os.path.dirname(os.path.abspath(__file__))

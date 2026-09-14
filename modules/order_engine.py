@@ -41,7 +41,6 @@ Fix (2026-04-14):
 """
 
 import os
-import json
 import math
 import logging
 import requests
@@ -316,23 +315,6 @@ def _place_order(
 
 
 # ─── Query order status ──────────────────────────────────────────────────────
-
-def _query_order_status(symbol: str, order_id: int) -> str | None:
-    """Query Binance for the current status of an order. Returns status string or None."""
-    try:
-        params = sign_params({"symbol": symbol, "orderId": str(order_id)})
-        resp = SESSION.get(
-            BASE_URL + "/fapi/v1/order",
-            params=params,
-            headers=api_headers(),
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            return resp.json().get("status")
-    except Exception as exc:
-        log.warning(f"[LIVE] order status query failed [{symbol}] orderId={order_id}: {exc}")
-    return None
-
 
 # ─── Fetch fill price ─────────────────────────────────────────────────────────
 

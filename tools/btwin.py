@@ -17,7 +17,7 @@ Reports two layers:
               compute_position_size sizing, slots, margin ceiling, loss caps,
               compounding equity)
 """
-import os, sys, glob, json, logging
+import os, sys, glob, logging
 from collections import defaultdict, Counter
 
 PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # relocation-proof; was a hardcoded absolute path

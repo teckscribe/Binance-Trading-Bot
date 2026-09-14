@@ -21,10 +21,9 @@ NOTE: linear (logistic) ablation is a conservative proxy; the production model
 is a RandomForest.  A positive linear signal is strong evidence; a null linear
 result should be re-checked with the RF (run in the bot venv) before concluding.
 """
-import os, sys, json, math
+import os, json, math
 from datetime import datetime
 import numpy as np
-import pandas as pd
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)

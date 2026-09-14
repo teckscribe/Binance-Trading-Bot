@@ -4,7 +4,6 @@ Adapted for BaseStrategy architecture using 5m resampled candles.
 """
 
 import pandas as pd
-import numpy as np
 import pandas_ta as ta
 import math
 from modules import settings_manager as cfg

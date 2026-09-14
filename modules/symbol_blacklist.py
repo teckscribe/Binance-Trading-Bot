@@ -260,37 +260,6 @@ def get_blacklist() -> dict:
     return active
 
 
-def clear_symbol(symbol: str) -> bool:
-    """
-    Manually remove a symbol from the blacklist.
-    Returns True if it was present, False if not found.
-    """
-    blacklist = _load_blacklist()
-    if symbol not in blacklist:
-        return False
-    del blacklist[symbol]
-    _save_blacklist(blacklist)
-
-    # Also wipe its hit history so it starts fresh
-    history = _load_history()
-    if symbol in history:
-        del history[symbol]
-        _save_history(history)
-
-    log.info(f"[Blacklist] {symbol} manually cleared")
-    return True
-
-
-def clear_all() -> list[str]:
-    """Clear all blacklisted symbols. Returns list of cleared symbols."""
-    blacklist = _load_blacklist()
-    symbols   = list(blacklist.keys())
-    _save_blacklist({})
-    _save_history({})
-    log.info(f"[Blacklist] All cleared: {symbols}")
-    return symbols
-
-
 def get_status() -> dict:
     """Summary for Telegram /status and daily report."""
     active = get_blacklist()
