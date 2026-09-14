@@ -49,3 +49,6 @@ Tire 1-2 Back Test engine/
 
 **/prep_cache.pkl
 *.pkl
+
+# replay harness scratch state (runtime, never commit)
+tools/replay/_run/

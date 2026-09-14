@@ -229,6 +229,8 @@ Rejected: `get_oi_trend()` "dead" — used by `trend_pullback.py`, kept for `bac
 
 **0.5.12 Legacy strategy files deleted (2026-09-14 21:15 IST).** `trend_pullback.py`, `funding_fade_v2.py`, `grid_strategy.py`, `freqtrade_port_ichi.py` removed. They were the "kept for backtest_optimizer" set from August; the box pulls the whole repo, so they were shipping to production as dead weight. Consequential removals: `StrategyFactory.get_grid()` and the scanner's grid-dissolve-on-regime-change block (checked `data/open_positions.json` — no GRID position exists); `get_oi_trend()` / `_oi_cache` / `_OI_CACHE_TTL` (TP was the sole caller — the §0.5.11 rejection of that audit item is now moot); `stop_exit_reason` no longer falls back to TP's `be_active` key (`live_logger`/`ml_engine` still read it for old records). `backtest_optimizer` `STRATEGY_CLASSES`/`TIER`/`MOCK_REGIME` reduced to CSM + NASOS_V4; `backtest_freqtrade_ports` NASOS only; replay sync list trimmed. Verified: pyflakes clean on touched files, compile-all, all entry points import, factory `['CSM','NASOS_V4']`, suites green, verify_deploy READY. Behaviour change: none for CSM/NASOS.
 
+**0.5.13 Final sweep of standalone scripts (2026-09-14 21:45 IST).** Every tracked `.py` was checked for references from code, services, shell scripts and the dashboard. All unreferenced files are entry points by design; each was then judged on whether it still does anything for a CSM + NASOS_V4 bot. Removed: `list_optimizer.py` (repo root — stale duplicate of `modules/list_optimizer.py`, the one the bots import; flagged since §17.17); `backtest_freqtrade_strategies.py` (backtested EI3v2 / ichiV1 / NASMAv3 from a `CSB_Top_5_Strategies/` directory that no longer exists — NASOS is covered by `backtest_freqtrade_ports.py`); `tools/replay/_run/*` untracked and git-ignored (replay-harness checkpoint/progress/paper-equity state that had been committed by accident). Kept, deliberately: `analyze_strategies.py`, `bot_cleanup.py`, `dashboard_2fa_setup.py`, `fetch_binance_data.py`, `run_specific_backtest.py`, `backtest_freqtrade_ports.py`, `backtest_optimizer.py`, every `tools/*.py` (all still run against CSM/NASOS data and are indexed in the tools table, §8), the ngrok trio (in `commands.txt`). `tools/llmvalue.py`'s docstring still describes the August "CSM in all regimes" config — the measurement it makes is still valid, the prose is dated.
+
 ---
 
 ## 1. CURRENT STATE
@@ -3118,8 +3120,7 @@ cd /home/psms/ubuntu/program_files/csb && git pull && sudo systemctl restart csb
 
 18. **Bump fetch_btc_reference 50 → 200 bars** so ADX warm-up converges.
 19. ~~**ML_PHASE=2 active**~~ (was: Phase 2 unlocks at 50 trades). Phase 3 target: 500 live trades.
-20. **Decide on dead code** (§17.17): freqtrade_port_sma.py, root list_optimizer.py,
-    freqtrade_port_ichi.py, 9 unused functions. All inert; housekeeping only.
+20. ~~**Decide on dead code** (§17.17)~~ — done 2026-09-14 (§0.5.9, §0.5.12, §0.5.13): all listed files and functions deleted.
 
 ## 10. HARD-WON LESSONS
 
