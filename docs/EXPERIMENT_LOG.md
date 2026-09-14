@@ -234,6 +234,16 @@ Rejected: `get_oi_trend()` "dead" — used by `trend_pullback.py`, kept for `bac
 **0.5.14 Kronos threshold de-duplicated (2026-09-14 22:30 IST).** `kronos-shadow.service` carried `Environment=KRONOS_PF_THR=0.020`, used by the worker only to stamp `would_gate` on each score row; the live gate reads 0.025 from `settings.json`. Two copies of a hot setting. Options weighed: (a) worker reads `settings.json` — one more reader, couples the standalone venv process to `modules/`; (b) hard-code in the worker — same drift, different file; (c) **remove the threshold from the worker entirely** — chosen. The worker writes raw scores; `progress.py` computes `pred_fav >= cfg.get("KRONOS_PF_THR")` per request, so old rows are re-read at whatever the threshold is now. `enrich_ablation` never used the flag for decisions (PASS/BLOCK splits are computed from `pred_fav`). Rows before this change still carry `would_gate` at 0.020 — informational, unread. Also measured (§ response to operator, same day): worker response median 4.0 s first candidate (5 s poll + ~1.2 s per score), 7.5 s median for the last of a typical 4-candidate burst; gate adds 4–7 s to a CSM entry, capped at 8 s per cycle; NASOS unaffected. `KRONOS_POLL_SEC` is unset (default 5 s).
 **On the box:** `sudo cp kronos/kronos-shadow.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart kronos-shadow csb-web`.
 
+**0.5.15 `KRONOS_POLL_SEC` 5 → 2 s (2026-09-14 23:00 IST).** Simulation over the 2,702 scan bursts in `shadow_scores.jsonl` (09-11 → 09-14 01:35 UTC), using the scanner's real behaviour — highest-strength candidate executes first and waits `KRONOS_GATE_WAIT_SEC=8` for its score:
+
+| Poll | Top-ranked score latency (median / p90) | Cycles where top-ranked times out → fail-open |
+|---|---|---|
+| 5 s (was) | 5.0 s / 9.0 s | **14.4 %** |
+| 2 s (now) | 3.5 s / 7.5 s | **8.5 %** |
+| 1 s | 3.0 s / 7.0 s | 7.2 % |
+
+Poll is `os.path.getsize()` on the queue file — no network. Worker kline load is per candidate (3.65/min ≈ 7 weight/min) and unchanged. Which candidates pass/fail is unchanged; ~6 % more cycles get a verdict instead of falling open. The residual 8.5 % is per-candidate scoring time (~1.2 s) on bursts of 6+ where the top pick sits deep in a queue written in scan order; the fix would be to queue in rank order — deferred until journal `fail-open` counts over a week show it matters. Deploy: copy unit, `daemon-reload`, restart `kronos-shadow`.
+
 ---
 
 ## 1. CURRENT STATE

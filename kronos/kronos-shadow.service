@@ -8,6 +8,10 @@ Type=simple
 User=psms
 WorkingDirectory=/home/psms/ubuntu/program_files/csb
 Environment=KRONOS_THREADS=2
+# Queue poll interval. 5s default left the top-ranked candidate unscored past
+# the 8s gate wait in 14.4% of cycles (fail-open); 2s measured at 8.5%. The poll
+# is a local file stat -- no API weight, no model work.
+Environment=KRONOS_POLL_SEC=2
 ExecStart=/home/psms/ubuntu/program_files/csb/kronos/venv/bin/python /home/psms/ubuntu/program_files/csb/kronos/shadow_worker.py
 Restart=always
 RestartSec=10
