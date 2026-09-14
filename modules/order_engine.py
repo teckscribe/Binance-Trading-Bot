@@ -616,13 +616,16 @@ def _cancel_stop_order(symbol: str, order_id: int | None) -> None:
 
 # ─── Fetch open positions from Binance ────────────────────────────────────────
 
-def _get_binance_open_positions() -> dict:
+def _get_binance_open_positions() -> dict | None:
     """
     Fetch all open positions from Binance /fapi/v2/positionRisk.
 
     Returns:
         Dict keyed by (symbol, positionSide) → position info dict.
         Only includes positions with non-zero positionAmt.
+        None when the call FAILED. The distinction matters: {} means Binance
+        reported no open positions; None means we do not know. A caller that
+        would act on "position is gone" must treat None as "skip this cycle".
 
     Example return:
         {
@@ -645,7 +648,7 @@ def _get_binance_open_positions() -> dict:
         )
         if resp.status_code != 200:
             log.warning(f"positionRisk fetch failed: {resp.text[:200]}")
-            return {}
+            return None
 
         positions = {}
         for p in resp.json():
@@ -658,7 +661,7 @@ def _get_binance_open_positions() -> dict:
         return positions
     except Exception as exc:
         log.warning(f"positionRisk exception: {exc}")
-        return {}
+        return None
 
 
 def _get_manual_close_price(symbol: str, direction: str) -> float | None:
@@ -706,10 +709,13 @@ def _get_manual_close_price(symbol: str, direction: str) -> float | None:
     return None
 
 
-def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None]:
+def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None, bool]:
     """
     Work out WHY a tracked position is no longer on Binance, from the order
-    history since entry. Returns (exit_reason, exit_source, fill_price).
+    history since entry. Returns (exit_reason, exit_source, fill_price,
+    confirmed). confirmed=False means NO closing fill could be found — which
+    is what a position that is still open looks like, so the caller must not
+    book a close on it.
 
     A position vanishing from positionRisk has three common causes, and only
     one of them is a human:
@@ -747,8 +753,9 @@ def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None]:
              and o.get("side") == close_side
              and o.get("positionSide") == pos_side]
     if not fills:
+        # allOrders may itself have failed; userTrades is the second witness.
         price = _get_manual_close_price(symbol, direction)
-        return "MANUAL_CLOSE", "manual", price
+        return "MANUAL_CLOSE", "manual", price, price is not None
 
     o = max(fills, key=lambda x: int(x.get("updateTime", 0) or 0))
     try:
@@ -760,12 +767,12 @@ def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None]:
                   str(o.get("orderId")) == str(pos.get("stop_order_id"))
 
     if otype in ("STOP_MARKET", "STOP") or is_our_stop:
-        return "SL_HIT", "exchange", price
+        return "SL_HIT", "exchange", price, True
     if otype == "LIQUIDATION":
-        return "LIQUIDATED", "exchange", price
+        return "LIQUIDATED", "exchange", price, True
     if otype in ("TAKE_PROFIT_MARKET", "TAKE_PROFIT"):
-        return "TP_HIT", "exchange", price
-    return "MANUAL_CLOSE", "manual", price
+        return "TP_HIT", "exchange", price, True
+    return "MANUAL_CLOSE", "manual", price, True
 
 
 def _get_live_contracts(symbol: str, direction: str) -> float | None:
@@ -777,6 +784,8 @@ def _get_live_contracts(symbol: str, direction: str) -> float | None:
     """
     position_side = "LONG" if direction == "LONG" else "SHORT"
     positions     = _get_binance_open_positions()
+    if positions is None:
+        return None
     p = positions.get((symbol, position_side))
     if p is None:
         return None
@@ -1165,6 +1174,14 @@ class OrderEngine:
             return []
 
         binance_positions = _get_binance_open_positions()
+        if binance_positions is None:
+            # The call failed. {} would mean "Binance has no positions" and
+            # made every tracked position look manually closed — that is
+            # exactly what happened 108 times before this guard (booked at
+            # entry price, then the real position was found again a cycle
+            # later and market-closed as an orphan). Unknown state: do nothing.
+            log.warning("[Reconcile] positionRisk unavailable — skipping reconcile this cycle")
+            return []
 
         # ── ORPHAN CLOSE (replaces ORPHAN ADOPTION) ──────────────────────────
         # Orphans are positions on Binance not tracked by the bot (residuals
@@ -1225,19 +1242,34 @@ class OrderEngine:
             sym       = pos["symbol"]
             direction = pos["direction"]
             pos_side  = "LONG" if direction == "LONG" else "SHORT"
+            if (sym, pos_side) in binance_positions:
+                pos.pop("_missing_cycles", None)
 
             if LIVE_ENABLED and (sym, pos_side) not in binance_positions:
                 # Position not on exchange. Find out why BEFORE cancelling the
                 # stop — a filled stop is the usual reason, and it is an SL
                 # hit, not a manual close.
-                exit_reason, exit_source, close_price = _classify_exchange_close(pos)
+                exit_reason, exit_source, close_price, confirmed = _classify_exchange_close(pos)
+                if not confirmed or close_price is None:
+                    # No closing fill anywhere. A real close always leaves
+                    # one, so this is far more likely a stale or partial
+                    # positionRisk read than a closed trade. Keep tracking,
+                    # leave the exchange stop in place, try again next cycle.
+                    n = int(pos.get("_missing_cycles", 0)) + 1
+                    pos["_missing_cycles"] = n
+                    if n == 1 or n % 30 == 0:
+                        log.warning(
+                            f"[Reconcile] {sym} {direction} absent from positionRisk "
+                            f"but NO closing fill found ({n} cycle(s)) — keeping it, "
+                            f"not booking a close"
+                        )
+                    continue
+                pos.pop("_missing_cycles", None)
                 _cancel_stop_order(sym, pos.get("stop_order_id"))
-                if close_price is None:
-                    close_price = pos["entry_price"]   # fallback
 
                 log.warning(
                     f"[Reconcile] {exit_reason} on exchange: {sym} {direction} | "
-                    f"close price ~{close_price:.4f} (source={exit_source})"
+                    f"close price {close_price:.4f} (source={exit_source})"
                 )
 
                 entry       = pos["entry_price"]
