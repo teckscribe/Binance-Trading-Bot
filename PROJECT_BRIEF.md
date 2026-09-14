@@ -34,7 +34,7 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 - **Active Production Strategies**:
   1. **CSM (Cross-Sectional Momentum)**: Volatility-normalized 24h momentum breakout with **Dual-Stage Hybrid Profit Ladder**, **Monotone High-Water Mark (HWM) peak tracking**, and **Volume Expansion Filter**. Proven in RANGING (+666%–+719% net). Also active in BEAR_TREND from 2026-09-12 as a live monitoring experiment (backtest baseline: −0.144%/trade — see §0.2.11 in EXPERIMENT_LOG).
   2. **NASOS_V4**: Freqtrade-ported multi-indicator volatility strategy. Active in BULL_TREND and BEAR_TREND.
-  3. **ELLIOT_V8**: Freqtrade-ported Elliot Wave impulse breakout strategy. *(Currently benched: regime permissions set to False in all regimes 2026-09-12. Reinstated when ≥100 live trades confirm the backtest baseline — see §0.2.11 in EXPERIMENT_LOG.)*
+  3. ~~ELLIOT_V8~~ — **removed from the codebase 2026-09-14** (benched since 09-12, backtest PF ~1.01 after-tax negative; §0.5 in EXPERIMENT_LOG).
 
 ### Stage 4 — Risk Engine & Telemetry · modules/risk_engine.py + modules/ml_engine.py
 - Dynamic position sizing based on account equity, ATR stop distance, and leverage cap.
@@ -58,9 +58,8 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 |---|---|---|---|
 | **CSM** | Cross-Sectional Momentum | 24h move in 3.0–4.0 ATR(1h) band + **Completed-Candle Volume Expansion Filter** (`vol_ratio >= 1.0x` 24h avg). | **Dual-Stage Hybrid Ladder**: Stage 1 (+1.0% → +0.15% lock) on 15m bar close; Stages 2 & 3 (+2.5% → +1.50%, +4.0% → +2.50%) on Peak HWM; ATR trailing stop; HWM entry-candle guard. |
 | **NASOS_V4** | Freqtrade NASOS Port | Multi-timeframe trend & momentum confirmation with ATR breakout. | Dynamic SL + ATR trailing profit targets. |
-| **ELLIOT_V8** | Freqtrade Elliot Wave Port *(benched 2026-09-12)* | Wave impulse expansion and wave-3 continuation detection. | Dynamic SL + Wave exhaustion exit. *(Regime permissions False in all regimes. Regime gates re-opened when ≥100 live trades available for validation — §0.2.11 EXPERIMENT_LOG.)* |
 
-*Retired/Archived: WKD, OIB, LIQ, VRP, FF_V2, TP, LLM_ADVISOR.*
+*Retired/Archived: ELLIOT_V8 (removed 2026-09-14), WKD, OIB, LIQ, VRP, FF_V2, TP, LLM_ADVISOR.*
 
 ---
 
@@ -156,4 +155,11 @@ The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) 
 
 ### Kronos Gate LIVE — 2026-09-14 08:30 IST
 32. **Kronos gate switched on** (`KRONOS_GATE=live`, `KRONOS_PF_THR=0.025`, `KRONOS_GATE_WAIT_SEC=8`, all hot in `settings.json`). Robustness sweep on the 81-trade sample: PASS > BLOCKED at every threshold 0.010–0.030, bottom-25 candidates PF 0.28 — loser-detection robust; PASS-side profit concentrated in one trade. CSM entries with `pred_fav` below threshold are skipped; no score within 8s → fail-open. Kronos worker unchanged. Next reading after ≥40 gated trades. EXPERIMENT_LOG §0.4.
+
+### Phantom-Close Fix, Rate Throttle, NASOS Shadow, ELLIOT Removal — 2026-09-14 14:00 IST
+33. **Phantom "manual" closes fixed** (`52b2a1a`, `94953f5`): a failed `positionRisk` read returned `{}` and the reconciler treated every tracked position as manually closed — booked at entry price, dropped from tracking, then market-closed as an orphan one cycle later with its real P&L never recorded. 108 such trades in the synced history (37 on 09-13). Now: a failed read skips the cycle, a missing position is only booked when a real closing fill exists, and exchange-stop fills are labelled `SL_HIT`, not `MANUAL_CLOSE`.
+34. **Weight-aware rate throttle** (`174b23a`, `modules/rate_budget.py`): the `-1003` rejections behind the failed reads came from running ~2700 request-weight/min against Binance's 2400 cap (30ms request gap counted requests, not weight). Every `SESSION` call is now gated on `X-MBX-USED-WEIGHT-1M` with soft (1900, scan) / hard (2300, position management) ceilings and full `Retry-After` backoff on 429/418. `SCAN_INTERVAL_SECONDS` set to 120 on the box → ~1740/min worst case.
+35. **Full trade context captured** (`2532de6`): regime at entry/exit, BTC/ETH/SOL trend, funding, signal price + fill slippage, Kronos score, ML outputs, settings snapshot, MFE/MAE, stop moves — on every ledger EXIT record and ML outcome row. Kronos score + regime shown in Telegram/Discord alerts and dashboard tables (`d1f36f9`).
+36. **NASOS_V4 queued for Kronos shadow scoring** — shadow only, gate remains CSM-only (`KRONOS_GATE_STRATEGIES`). Ablation and progress tooling are per-strategy; the dashboard Kronos card shows the NASOS matched count. Verdict when its matched count reaches 80.
+37. **ELLIOT_V8 removed from the codebase**: `modules/strategies/freqtrade_port_elliot.py` deleted; factory, regime matrix, leverage table, settings default, bots, notifiers, dashboard, backtesters and tools updated. Existing `ELLIOT_V8` entries in on-box `data/settings.json` (`MAX_PER_STRATEGY`) and `strategy_overrides.json` are ignored harmlessly.
 

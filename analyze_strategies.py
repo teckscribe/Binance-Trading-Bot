@@ -39,7 +39,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
+    return ["CSM", "NASOS_V4"]
 
 
 STRATEGIES = _production_strategy_ids()
@@ -181,7 +181,7 @@ def print_report(all_trades: dict[str, list[dict]], mode: str) -> None:
         # Production
         "CSM":        "🟢 Cross-Sectional Momentum",
         "NASOS_V4":   "🟡 NASOS V4 Dip-Buy",
-        "ELLIOT_V8":  "🟣 Elliot V8 Dip-Buy",
+        "ELLIOT_V8":  "🟣 Elliot V8 Dip-Buy (archived)",
         # Archived (labels kept so old logs still render nicely)
         "SMA_OFFSET": "⚪ SMA Offset Dip-Buy (archived)",
         "LIQ":   "⚪ Liquidation Cascades (archived)",

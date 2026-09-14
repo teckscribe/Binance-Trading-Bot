@@ -86,7 +86,6 @@ from modules.strategies.trend_pullback            import TrendPullback
 from modules.strategies.cross_sectional_momentum  import CrossSectionalMomentum
 from modules.strategies.funding_fade_v2           import FundingFadeV2
 from modules.strategies.freqtrade_port_nasos       import NASOSv4Port
-from modules.strategies.freqtrade_port_elliot      import ElliotV8Port
 
 from modules.risk_engine import (
     MAX_MARGIN_PCT, max_concurrent, daily_loss_cap, weekly_loss_cap,
@@ -120,7 +119,7 @@ SLIPPAGE_PCT    = max(0.0, float(os.getenv("SLIPPAGE_PCT", "0")))
 BT_MIN_STRENGTH = max(0.0, float(os.getenv("BT_MIN_STRENGTH", "0")))
 
 # Regime gate: block specific strategies in specific regimes.
-# Format: "RANGING:NASOS_V4,ELLIOT_V8;OVERHEATED:CSM" — semicolon-separated
+# Format: "RANGING:NASOS_V4;OVERHEATED:CSM" — semicolon-separated
 # regime:strategy pairs. Empty string (default) = no gating.
 BT_REGIME_GATE = os.getenv("BT_REGIME_GATE", "")
 _regime_block = {}
@@ -158,7 +157,6 @@ STRATEGY_CLASSES = {
     "TP":    TrendPullback,
     "FF_V2": FundingFadeV2,
     "NASOS_V4":   NASOSv4Port,
-    "ELLIOT_V8":  ElliotV8Port,
 }
 
 # Default to whatever the factory actually runs, so a backtest reflects
@@ -173,7 +171,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
+    return ["CSM", "NASOS_V4"]
 
 
 PRODUCTION_IDS = _production_strategy_ids()
@@ -184,13 +182,11 @@ STRATEGY_ORDER = PRODUCTION_IDS + [
 ]
 TIER = {"CSM": "Elite",
         "TP": "Good", "FF_V2": "Good",
-        "NASOS_V4": "FT",
-        "ELLIOT_V8": "FT"}
+        "NASOS_V4": "FT"}
 
 MOCK_REGIME = {"CSM": "BULL_TREND", "TP": "BULL_TREND",
                "FF_V2": "BULL_TREND",
-               "NASOS_V4": "BULL_TREND",
-               "ELLIOT_V8": "BULL_TREND"}
+               "NASOS_V4": "BULL_TREND"}
 
 # Tokenised equities and leveraged ETFs on Binance USDM Futures. These only
 # move during US cash-session hours and have no perpetual funding dynamics,

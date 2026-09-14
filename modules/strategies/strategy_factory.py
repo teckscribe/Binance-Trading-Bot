@@ -5,7 +5,6 @@ Instantiate and return the production strategy objects.
 Production set (3), listed in scan-priority order:
     CSM        - Cross-Sectional Momentum  (4-5x ATR(1h) 24h move, long + short)
     NASOS_V4   - NASOS V4 Dip-Buy         (EWO + RSI dip-buy on 5m)
-    ELLIOT_V8  - Elliot V8 Dip-Buy        (EWO dip-buy with trailing stop)
 
 DELETED 2026-08-20: SMA_OFFSET.
   Negative in every configuration on the corrected harness with 0.03%/side
@@ -32,7 +31,6 @@ dissolve any pre-existing grid positions on a regime change.
 from modules.strategies.base_strategy               import BaseStrategy
 from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
 from modules.strategies.freqtrade_port_nasos        import NASOSv4Port
-from modules.strategies.freqtrade_port_elliot       import ElliotV8Port
 
 # Retained only so live_scanner can dissolve legacy grid positions on a regime
 # change. GRID is not in _ALL_STRATEGIES and cannot open new positions.
@@ -45,7 +43,6 @@ except ImportError:
 _ALL_STRATEGIES = [
     CrossSectionalMomentum(),
     NASOSv4Port(),
-    ElliotV8Port(),
 ]
 
 _STRATEGY_MAP = {s.STRATEGY_ID: s for s in _ALL_STRATEGIES}

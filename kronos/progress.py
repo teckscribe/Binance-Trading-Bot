@@ -73,12 +73,15 @@ def _backlog(offset_file, queue_file):
     return n
 
 
-def _csm_trades():
+SHADOW_STRATEGIES = ("CSM", "NASOS_V4")
+
+
+def _trades(strategy):
     sigs = {s["signal_id"]: s for s in _load_jsonl(SIGNALS) if "signal_id" in s}
     outs = {o["signal_id"]: o for o in _load_jsonl(OUTCOMES) if "signal_id" in o}
     rows = []
     for sid, s in sigs.items():
-        if s.get("strategy") != "CSM":
+        if s.get("strategy") != strategy:
             continue
         o = outs.get(sid)
         if not o or o.get("pnl_equity_pct", o.get("pnl_pct")) is None:
@@ -142,12 +145,18 @@ def progress() -> dict:
     queue = _load_jsonl(REQ)
     kscores = _load_jsonl(KRONOS_OUT)
     wrows = _load_jsonl(WHALE_OUT)
-    trades = _csm_trades()
+    trades = _trades("CSM")
 
     k_ok = [r for r in kscores if "err" not in r and r.get("entry_price")]
     k_err = len(kscores) - len(k_ok)
     k_gate = sum(1 for r in k_ok if r.get("would_gate"))
-    k_matched = _match_kronos(trades, k_ok)
+    # rows without a strategy tag predate NASOS queueing and are CSM
+    k_by = {s: [r for r in k_ok if r.get("strategy", "CSM") == s] for s in SHADOW_STRATEGIES}
+    k_matched = _match_kronos(trades, k_by["CSM"])
+    by_strategy = {s: {"scored": len(k_by[s]),
+                       "matched": _match_kronos(_trades(s), k_by[s]),
+                       "trades_with_outcome": len(_trades(s))}
+                   for s in SHADOW_STRATEGIES}
 
     w_ok = [r for r in wrows if "err" not in r and r.get("top_ls") is not None]
     w_err = len(wrows) - len(w_ok)
@@ -184,6 +193,7 @@ def progress() -> dict:
                         _backlog(KRONOS_OFF, REQ), _last(kscores, "scored_at"),
                         {"would_gate": k_gate,
                          "gate_rate_pct": round(100.0 * k_gate / len(k_ok), 1) if k_ok else 0.0,
+                         "by_strategy": by_strategy,
                          "verdict_tool": "kronos/enrich_ablation.py"}),
         "whale": block(w_matched, WHALE_TARGET, len(w_ok), w_err,
                        _backlog(WHALE_OFF, REQ), _last(wrows, "collected_at") or _last(wrows, "ts"),

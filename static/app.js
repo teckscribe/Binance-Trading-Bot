@@ -840,6 +840,8 @@ async function fetchKronosProgress() {
         if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
         kpFill("k", d.kronos);
         kpFill("w", d.whale);
+        const n = d.kronos.by_strategy?.NASOS_V4, ne = document.getElementById("kp-k-nasos");
+        if (ne && n) ne.textContent = `NASOS_V4 shadow: ${n.matched} / ${d.kronos.target} matched · scored ${n.scored} · trades with outcome ${n.trades_with_outcome} (not gated)`;
         const g = document.getElementById("kp-gate");
         if (g && d.gate) {
             const m = d.gate.mode || "unknown";

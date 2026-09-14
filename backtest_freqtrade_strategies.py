@@ -298,69 +298,6 @@ def run_EI3v2(df):
     }
 
 
-def run_ElliotV8(df):
-    """ElliotV8_original_ichiv2 — EWO dip-buy with trailing stop."""
-    d = df.copy()
-
-    base_nb_candles_buy = 12
-    base_nb_candles_sell = 22
-    low_offset = 0.987
-    high_offset = 1.008
-    high_offset_2 = 1.016
-    ewo_high = 3.147
-    ewo_low = -17.145
-    rsi_buy = 57
-
-    d['ma_buy'] = EMA(d['close'], base_nb_candles_buy)
-    d['ma_sell'] = EMA(d['close'], base_nb_candles_sell)
-    d['hma_50'] = HMA(d['close'], 50)
-    d['EWO'] = EWO(d, 50, 200)
-    d['rsi'] = RSI(d['close'], 14)
-    d['rsi_fast'] = RSI(d['close'], 4)
-    d['rsi_slow'] = RSI(d['close'], 20)
-
-    buy1 = (
-        (d['rsi_fast'] < 35) &
-        (d['close'] < (d['ma_buy'] * low_offset)) &
-        (d['EWO'] > ewo_high) &
-        (d['rsi'] < rsi_buy) &
-        (d['volume'] > 0) &
-        (d['close'] < (d['ma_sell'] * high_offset))
-    )
-    buy2 = (
-        (d['rsi_fast'] < 35) &
-        (d['close'] < (d['ma_buy'] * low_offset)) &
-        (d['EWO'] < ewo_low) &
-        (d['volume'] > 0) &
-        (d['close'] < (d['ma_sell'] * high_offset))
-    )
-    d['buy'] = (buy1 | buy2).astype(int)
-
-    sell1 = (
-        (d['close'] > d['hma_50']) &
-        (d['close'] > (d['ma_sell'] * high_offset_2)) &
-        (d['rsi'] > 50) &
-        (d['volume'] > 0) &
-        (d['rsi_fast'] > d['rsi_slow'])
-    )
-    sell2 = (
-        (d['close'] < d['hma_50']) &
-        (d['close'] > (d['ma_sell'] * high_offset)) &
-        (d['volume'] > 0) &
-        (d['rsi_fast'] > d['rsi_slow'])
-    )
-    d['sell'] = (sell1 | sell2).astype(int)
-
-    return d[['close', 'buy', 'sell']], {
-        'trailing_stop': True,
-        'trailing_stop_positive': 0.001,
-        'trailing_stop_positive_offset': 0.02,
-        'stoploss': -0.20,
-        'sell_profit_only': True,
-        'sell_profit_offset': 0.01,
-    }
-
-
 def run_ichiV1(df):
     """ichiV1 — Ichimoku cloud + multi-TF trend fan magnitude."""
     d = df.copy()
@@ -596,7 +533,6 @@ def run_NASMAv3(df):
 
 STRATEGIES = {
     "EI3v2_tag_cofi_green":              run_EI3v2,
-    "ElliotV8_original_ichiv2":          run_ElliotV8,
     "ichiV1":                            run_ichiV1,
     "NASOSv4":                           run_NASOSv4,
     "NotAnotherSMAOffsetStrategyHOv3":   run_NASMAv3,

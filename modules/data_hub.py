@@ -279,7 +279,7 @@ def fetch_active_positions_data(symbols: list) -> dict:
         # 400, not 100. The freqtrade ports resample 1m->5m in manage() and
         # bail on `len(df_5m) < 55`, i.e. they need >=275 1m bars. At 100 they
         # returned no_exit() on EVERY fast cycle — thousands per hour, all
-        # no-ops — so an open NASOS_V4 / ELLIOT_V8 position was never evaluated
+        # no-ops — so an open NASOS_V4 position was never evaluated
         # between full cycles. 400 gives 80 resampled bars, enough for the
         # HMA(50) and RSI(20) those exits read.
         df_1m = _rate_gated_fetch(symbol, "1m", limit=400)

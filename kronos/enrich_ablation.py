@@ -77,13 +77,15 @@ def build():
                "pnl": float(pnl), "win": int(float(pnl) > 0)}
         labelled.append(row)
 
-    # match Kronos verdict
+    # match Kronos verdict. Candidates are keyed by symbol; rows carry a
+    # `strategy` tag since 2026-09-14 (NASOS_V4 queued alongside CSM) and
+    # older rows without one are CSM. A trade only matches a candidate of the
+    # same strategy so a NASOS entry cannot borrow a CSM score.
     matched = 0
     for row in labelled:
         row["kronos"] = None
-        if row["strategy"] != "CSM":
-            continue
-        cands = byS.get(row["symbol"], [])
+        cands = [c for c in byS.get(row["symbol"], [])
+                 if c.get("strategy", "CSM") == row["strategy"]]
         et = _ts(row["ts"]); ep = row["entry_price"]
         if not cands or et is None or ep is None:
             continue
@@ -165,23 +167,30 @@ def main():
     with open(ENRICHED, "w") as f:
         for r in labelled:
             f.write(json.dumps(r) + "\n")
-    csm = [r for r in labelled if r["strategy"] == "CSM"]
-    km = [r for r in csm if r.get("kronos")]
     print(f"labelled (signal x outcome): {len(labelled)}")
-    print(f"  CSM: {len(csm)}   matched to Kronos: {len(km)} "
-          f"({100*len(km)/len(csm):.0f}% of CSM)" if csm else "  CSM: 0")
     print(f"enriched dataset -> {ENRICHED}")
-    if km:
-        wins = sum(r["win"] for r in km)
-        pf_favs = [r["kronos"]["pred_fav"] for r in km]
-        print(f"  matched win rate {100*wins/len(km):.1f}%   pred_fav med {np.median(pf_favs):+.4f}")
+    strategies = sorted({r["strategy"] for r in labelled if r.get("strategy")})
+    for sid in strategies:
+        rows = [r for r in labelled if r["strategy"] == sid]
+        km = [r for r in rows if r.get("kronos")]
+        line = f"  {sid:10} trades {len(rows):4d}   matched to Kronos: {len(km):4d}"
+        if km:
+            wins = sum(r["win"] for r in km)
+            line += (f"   win {100*wins/len(km):.1f}%   pred_fav med "
+                     f"{np.median([r['kronos']['pred_fav'] for r in km]):+.4f}")
+        print(line)
+    for sid in strategies:
+        km = [r for r in labelled if r["strategy"] == sid and r.get("kronos")]
+        if not km:
+            continue
+        if len(km) < MIN_ABLATE:
+            print(f"\n{sid}: ABLATION DEFERRED — need >= {MIN_ABLATE} matched rows, have {len(km)} "
+                  f"(~{MIN_ABLATE - len(km)} more).")
+            continue
+        _ablate(sid, km)
 
-    if len(km) < MIN_ABLATE:
-        print(f"\nABLATION DEFERRED: need >= {MIN_ABLATE} matched CSM rows, have {len(km)}.")
-        print(f"  Re-run when the shadow log + ML outcomes have grown "
-              f"(~{MIN_ABLATE - len(km)} more matched trades).")
-        return
 
+def _ablate(sid, km):
     # assemble matrices
     fnames = list(km[0]["features"].keys())
     Xb = np.array([[float(r["features"].get(k, 0.0)) for k in fnames] for r in km])
@@ -189,7 +198,7 @@ def main():
     y = np.array([r["win"] for r in km])
     Xp = np.hstack([Xb, Xk])
 
-    print(f"\n== ABLATION (5-fold CV logistic AUC, N={len(km)}) ==")
+    print(f"\n== {sid} ABLATION (5-fold CV logistic AUC, N={len(km)}) ==")
     a_uni, _ = _cv_auc(Xk, y)
     a_base, nb = _cv_auc(Xb, y)
     a_plus, npl = _cv_auc(Xp, y)

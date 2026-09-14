@@ -1237,7 +1237,7 @@ def _scan_for_signals(
                         near_misses[sid] = sig
                 elif sig.get("strength", 1.0) >= MIN_STRENGTH:
                     candidates.append(sig)
-                    if _sid == "CSM":
+                    if _sid in KRONOS_SHADOW_STRATEGIES:
                         # Queued now so the worker can score it while the
                         # rest of the scan runs; _kronos_gate() looks the
                         # score up by this ts at entry time.
@@ -1248,6 +1248,7 @@ def _scan_for_signals(
                                 sig.get("direction"),
                                 sig.get("entry_price"),
                                 sig.get("strength"),
+                                strategy=_sid,
                             )
                         except Exception:
                             pass
@@ -1279,10 +1280,17 @@ def _scan_for_signals(
 
 _kronos_gated_notified: dict[str, datetime] = {}
 
+# Strategies whose candidates are queued for Kronos scoring (shadow data), and
+# the subset the live gate actually acts on. NASOS_V4 is shadow-only until it
+# has its own verdict — the 0.025 threshold was measured on CSM and does not
+# transfer. Read per call so the sets can grow without touching the loop.
+KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4")
+KRONOS_GATE_STRATEGIES   = ("CSM",)
+
 
 def _kronos_gate(sig: dict, waited_out: dict) -> bool:
-    """True = entry may proceed. Only CSM signals are ever gated."""
-    if sig.get("strategy") != "CSM":
+    """True = entry may proceed. Only KRONOS_GATE_STRATEGIES are ever gated."""
+    if sig.get("strategy") not in KRONOS_GATE_STRATEGIES:
         return True
     mode = cfg.get("KRONOS_GATE")
     if mode == "off":
@@ -1926,7 +1934,7 @@ def main() -> None:
                 # Depth and 1h are derived from the permitted strategies AND
                 # from the strategies already HOLDING a position. Permitted
                 # alone was wrong: in RANGING the permitted set is CSM only
-                # (depth 200), so an open NASOS_V4 / ELLIOT_V8 position got 200
+                # (depth 200), so an open NASOS_V4 position got 200
                 # 1m bars -> 40 resampled 5m bars -> under the `< 55` guard ->
                 # unmanaged for the entire regime.
                 _permitted = StrategyFactory.get_permitted(

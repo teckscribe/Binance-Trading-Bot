@@ -224,7 +224,7 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
+    return ["CSM", "NASOS_V4"]
 
 
 _STRATS = _production_strats()

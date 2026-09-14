@@ -59,7 +59,7 @@ def _production_strategy_ids() -> list[str]:
     except Exception:
         pass
     # Fallback if the factory cannot be imported (keeps logging working).
-    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
+    return ["CSM", "NASOS_V4"]
 
 
 STRATEGIES = _production_strategy_ids()

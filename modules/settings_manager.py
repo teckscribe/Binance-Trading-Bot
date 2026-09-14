@@ -102,8 +102,8 @@ SPEC = [
     # ── Risk & sizing ────────────────────────────────────────────────────────
     _s("MAX_CONCURRENT", "Risk", "int", 3, "Max concurrent positions",
        "Total open positions across all strategies.", min=1, max=20),
-    _s("MAX_PER_STRATEGY", "Risk", "csv_caps", "CSM:3,NASOS_V4:3,ELLIOT_V8:3",
-       "Per-strategy caps", "Format: CSM:2,NASOS_V4:2,ELLIOT_V8:2"),
+    _s("MAX_PER_STRATEGY", "Risk", "csv_caps", "CSM:3,NASOS_V4:3",
+       "Per-strategy caps", "Format: CSM:2,NASOS_V4:2"),
     _s("MAX_TOTAL_MARGIN_PCT", "Risk", "float", 0.60, "Max total margin (fraction)",
        "Ceiling on combined margin as a fraction of equity.",
        min=0.05, max=1.0, step="0.01"),

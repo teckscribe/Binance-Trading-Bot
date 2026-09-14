@@ -27,7 +27,7 @@ _LOG = os.path.join(_LOGDIR, "shadow_requests.jsonl")
 _SCORES = os.path.join(_LOGDIR, "shadow_scores.jsonl")
 
 
-def log_candidate(symbol, direction, entry_price=None, strength=None, ts=None):
+def log_candidate(symbol, direction, entry_price=None, strength=None, ts=None, strategy="CSM"):
     """Append one CSM candidate to the shadow queue.  Best-effort, never raises.
 
     Returns the candidate's ts string (the key find_score() matches on), or
@@ -41,6 +41,7 @@ def log_candidate(symbol, direction, entry_price=None, strength=None, ts=None):
             "direction": direction,
             "entry_price": entry_price,
             "strength": strength,
+            "strategy": strategy,
         }
         with open(_LOG, "a") as f:
             f.write(json.dumps(rec) + "\n")

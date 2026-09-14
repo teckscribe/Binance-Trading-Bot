@@ -102,7 +102,6 @@ async def get_status():
 _STRATEGY_META = {
     "CSM":        ("Cross-Sectional Momentum",  "Elite",     "24h 4-5x ATR breakout (long + short)",  "#34D399"),
     "NASOS_V4":   ("NASOS V4 Dip-Buy",         "Freqtrade", "EWO + RSI dip-buy on 5m",          "#EAB308"),
-    "ELLIOT_V8":  ("Elliot V8 Dip-Buy",        "Freqtrade", "EWO dip-buy with trailing stop",   "#A855F7"),
 }
 
 

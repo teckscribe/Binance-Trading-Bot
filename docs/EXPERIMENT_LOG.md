@@ -190,6 +190,25 @@ print('ALL          ', stats(rows)); print('GATE PASS    ', stats(g)); print('GA
 
 ---
 
+### 0.5 Phantom Closes, Rate Limit, NASOS Shadow, ELLIOT Removal (2026-09-14 12:00–14:00 IST)
+
+**0.5.1 Phantom "manual" closes — root cause and fix.** Two profitable positions (VETUSDT +0.30 USDT, EDGEUSDT +0.04 on Binance) were reported by the bot as `MANUAL_CLOSE` with exit == entry and P&L = −fee at 12:09:56 IST, then closed on Binance at 12:11:05 in the same second. Chain: `positionRisk` returned `-1003` → `_get_binance_open_positions()` returned `{}` → reconciler treated both as manually closed, found no fill, booked at entry price, dropped them → next good read found them untracked → orphan-close market order. Synced history: **108 of 289 `MANUAL_CLOSE` exits carry the signature (exit == entry), 38 events of 2–3 positions in the same minute, 37 on 2026-09-13.** Their real P&L was never recorded; the ledger, paper equity, ML outcomes and the Kronos N=81 sample all contain them (booked ≈0, so they dilute rather than bias direction — treat the 09-13 regime numbers and §0.4 magnitudes as provisional).
+Fix (`94953f5`): fetch returns `None` on failure and reconcile skips the cycle; a missing position is booked only when a closing fill exists in `allOrders` (or `userTrades` as second witness); no entry-price fallback. Earlier (`52b2a1a`): exchange-stop fills classified `SL_HIT` / `LIQUIDATED` / `TP_HIT` instead of manual; `close_position()` no longer drops a position on a position-gone code.
+
+**0.5.2 Rate limit — cause of the failed reads.** Journal: 13 × `-1003` on 09-13 15:58–19:27, 1 at 09-14 12:09:55 (the VET/EDGE event), plus read timeouts. Weight accounting (BULL/BEAR, 3 positions): scan 150 × 1m `limit=1500` (w10) ≈ 1500 + 15m ≈ 300; fast cycle every 1s: positionRisk (w5) ≈ 300 + 3 × (1m w2 + mark w1) ≈ 540 → **~2650–2700/min vs 2400**. The 30ms gap counted requests, not weight. Fix (`174b23a`, `modules/rate_budget.py`): `SESSION.request` gated on `X-MBX-USED-WEIGHT-1M`, pre-charged per documented weight, soft ceiling 1900 (klines/exchangeInfo), hard 2300 (orders, positionRisk, mark, fills), waits to the clock-minute rollover, `Retry-After` honoured in full on 429/418/-1003. Operator chose `SCAN_INTERVAL_SECONDS=120` (fast stays 1s) → ~1740/min worst case, ~27% headroom; entries checked every 2 min (cost: up to 60s later entry).
+
+**0.5.3 Trade context capture** (`2532de6`, `d1f36f9`): see PROJECT_BRIEF item 35 for the field list. Motivation: the ledger carried no regime; the BEAR_TREND analysis earlier today had to be reconstructed from REGIME_CHANGE events (85/85 agreement with the ML stamp, so the reconstruction is trustworthy).
+
+**0.5.4 CSM by regime (reconstructed, 543 exits 08-06 → 09-14, BEFORE phantom-close correction).** All: PF 1.14. RANGING N=386 PF 1.17. BEAR_TREND N=58 PF 0.74; since enabled 09-12: N=35, win 14.3%, PF 0.24, avg hold 21 min, 30/35 `MANUAL_CLOSE` — but a large share of those are §0.5.1 phantoms, so **no permission change made**. Re-read after ≥1 week of clean data. Kronos split by regime (same 81): at 0.025 RANGING PASS N=13 PF 3.85 / BLOCKED N=35 PF 0.68; BEAR PASS N=6 PF 5.71 / BLOCKED N=27 PF 0.26 — the gate finds losers inside each regime, not just a regime proxy.
+
+**0.5.5 NASOS_V4 into the Kronos shadow queue** — `KRONOS_SHADOW_STRATEGIES = ("CSM","NASOS_V4")`, `KRONOS_GATE_STRATEGIES = ("CSM",)`. Queue rows carry `strategy`; `enrich_ablation.py` matches per strategy and ablates each with ≥80; progress panel shows NASOS matched. Zero cost (local model, public klines, ~5–10 weight/min). NASOS trades ~4× less often than CSM → expect 3–4 weeks to a verdict. Decision rule: same PASS/BLOCKED split at 0.020/0.025; gate only if BLOCKED PF ≤ 0.9 and PASS > BLOCKED at every threshold.
+
+**0.5.6 Ablation instability noted.** On the freshly synced data (N=83 vs 81) the logistic ablation reads base AUC 0.697 / +Kronos 0.682 (dAUC −0.015) vs the box's 0.624 / 0.646 (+0.022) two hours earlier. Two extra rows flipped the sign: at this N the ablation is noise. The PASS/BLOCKED split (§0.4) is the decision-grade reading; ignore dAUC until N ≥ 150.
+
+**0.5.7 ELLIOT_V8 removed.** Benched since 09-12 (PF ~1.01, after-tax negative), permitted nowhere, `MAX_PER_STRATEGY … ELLIOT_V8:0` on the box — it produced no trades, so keeping it only added dead branches and a strategy the Kronos tooling could never evaluate. Deleted `freqtrade_port_elliot.py`; removed from factory, regime matrix, leverage table, settings default, bots, notifiers, dashboard, backtesters, tools, replay sync list. Historical logs/docs untouched. On-box `settings.json` still lists `ELLIOT_V8:0` in caps and `strategy_overrides.json` has an entry — both ignored; the bots' cap validator will reject `ELLIOT_V8` on the next manual edit, which is the desired prompt to drop it.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-12. Sections below this point may use earlier parameter values

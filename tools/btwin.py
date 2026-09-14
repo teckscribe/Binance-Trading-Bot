@@ -34,7 +34,7 @@ for _n in list(logging.root.manager.loggerDict):
 
 DATA_DAYS = int(sys.argv[1])
 WINDOW    = int(sys.argv[2])
-STRATS    = (sys.argv[3].split(",") if len(sys.argv) > 3 else ["CSM", "NASOS_V4", "ELLIOT_V8"])
+STRATS    = (sys.argv[3].split(",") if len(sys.argv) > 3 else ["CSM", "NASOS_V4"])
 CAPITAL   = float(os.environ.get("BT_CAPITAL", "100"))
 
 symbols = sorted(os.path.basename(p).split("_15m_")[0]

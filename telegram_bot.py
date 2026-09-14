@@ -58,11 +58,11 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "ELLIOT_V8"]
+    return ["CSM", "NASOS_V4"]
 
 
 PROD_STRATS = _production_strats()
-STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "ELLIOT_V8": "🟣"}
+STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡"}
 SERVICE   = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -234,7 +234,7 @@ def _known_strategy_ids() -> list[str]:
 
 def validate_max_per_strategy(text: str) -> tuple[bool, str, str]:
     """
-    Validate a MAX_PER_STRATEGY string like "CSM:1,NASOS_V4:2,ELLIOT_V8:2".
+    Validate a MAX_PER_STRATEGY string like "CSM:1,NASOS_V4:2".
 
     Returns (ok, normalised_value, message). The message carries WARNINGS even
     when ok is True — a cap above MAX_CONCURRENT is inert, and a total below it
@@ -266,7 +266,7 @@ def validate_max_per_strategy(text: str) -> tuple[bool, str, str]:
         pairs.append((sid, n))
 
     if not pairs:
-        return False, "", "Nothing to set. Example: <code>CSM:1,NASOS_V4:2,ELLIOT_V8:2</code>"
+        return False, "", "Nothing to set. Example: <code>CSM:1,NASOS_V4:2</code>"
 
     value = ",".join(f"{s}:{n}" for s, n in pairs)
 
@@ -1773,7 +1773,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             f"strategy taking every slot.\n\n"
             f"Loaded strategies: <b>{', '.join(known) if known else 'unavailable'}</b>\n\n"
             f"Type <code>STRATEGY:N</code> pairs separated by commas.\n"
-            f"Example: <code>CSM:1,NASOS_V4:2,ELLIOT_V8:2</code>\n\n"
+            f"Example: <code>CSM:1,NASOS_V4:2</code>\n\n"
             f"<i>A strategy left out of the list is UNCAPPED.\n"
             f"Requires a scanner RESTART.</i>",
             parse_mode="HTML",

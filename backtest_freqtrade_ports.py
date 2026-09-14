@@ -35,7 +35,6 @@ logging.basicConfig(level=logging.WARNING)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from modules.strategies.freqtrade_port_nasos  import NASOSv4Port
-from modules.strategies.freqtrade_port_elliot import ElliotV8Port
 from modules.strategies.freqtrade_port_ichi   import IchiV1Port
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -66,7 +65,6 @@ def fetch_top_futures_symbols(n=100):
 
 STRATEGY_CLASSES = {
     "NASOS_V4":   NASOSv4Port,
-    "ELLIOT_V8":  ElliotV8Port,
     "ICHI_V1":    IchiV1Port,
 }
 
@@ -470,7 +468,7 @@ def print_report(by_strat, all_strategies, capital=INITIAL_CAPITAL, leverage=LEV
 def main():
     ap = argparse.ArgumentParser(description="Backtest ported Freqtrade strategies")
     ap.add_argument("--strategies", default=None,
-                    help="Comma-separated IDs (NASOS_V4,ELLIOT_V8,ICHI_V1)")
+                    help="Comma-separated IDs (NASOS_V4,ICHI_V1)")
     ap.add_argument("--symbols", default=None,
                     help="Comma-separated symbols (default: BTC,ETH,SOL,BNB,XRP)")
     ap.add_argument("--top", type=int, default=None,

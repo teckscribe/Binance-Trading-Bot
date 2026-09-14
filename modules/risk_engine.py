@@ -218,7 +218,6 @@ STRATEGY_LEVERAGE = {
     # ── Production ───────────────────────────────────────────────────────────
     "CSM":   3,
     "NASOS_V4":   3,
-    "ELLIOT_V8":  3,
     # ── Archived (retained so historical positions still size correctly) ─────
     "SMA_OFFSET": 3,
     "LIQ":  3,

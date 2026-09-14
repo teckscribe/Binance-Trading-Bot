@@ -25,7 +25,7 @@ logging.disable(logging.WARNING)
 
 DATA_DAYS = int(sys.argv[1])
 WINDOW    = int(sys.argv[2])
-STRATS    = ["CSM", "NASOS_V4", "ELLIOT_V8"]
+STRATS    = ["CSM", "NASOS_V4"]
 CAPITAL   = 100.0
 
 cache = os.path.join("data", "bt_cache_%dd_%s.json" % (DATA_DAYS, "-".join(sorted(STRATS))))
