@@ -150,3 +150,7 @@ The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) 
 28. **Backtest sweeps preserved**: a shell env value that did not come from `.env` still overrides the file (`CSM_MOM_LO=3.5 python backtest_optimizer.py`), and such overrides are never persisted.
 29. **Audit trail**: every applied change appends `{ts, source, key, from, to}` to `data/settings_history.jsonl` (source = dashboard / telegram / discord / migrate_from_env); dashboard Settings tab shows the last 30 via `GET /api/settings/history`.
 30. **Verification**: 42 unit checks (migration, typing, validation, cross-process hot reload ≤1s, corrupt-file recovery, `.env` preservation) + 51 integration checks (scanner refresh, live sizing gates, CSM max-hold, TOTP-authenticated dashboard save, bot helpers) + static wiring audit (every SPEC key read via `settings_manager`, zero `os.getenv` reads of migrated keys, no dangling keys, no legacy writers) — all green. Dashboard verified in browser.
+
+### Kronos Shadow Gate — First Verdict — 2026-09-14 07:00 IST
+31. **Kronos reached its verdict threshold (81/80 matched CSM trades)**. Ablation: Kronos-alone AUC 0.697 vs ML 27-feature AUC 0.624; base+Kronos dAUC +0.022. Gate split of the same 81 live trades (pre-registered 0.020 threshold): PASS N=31 PF 1.75 (+2.48%), BLOCKED N=50 PF 0.55 (−3.36%), ALL PF 0.92. **Not flipped live** — second reading required at N≈120 (PASS PF ≥ 1.3 and BLOCKED PF ≤ 0.9) before a hot-reloadable `KRONOS_GATE` setting is built. Full numbers, robustness checks and decision rule: EXPERIMENT_LOG §0.4.
+

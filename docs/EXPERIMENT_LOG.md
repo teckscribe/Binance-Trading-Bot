@@ -118,6 +118,58 @@ Commits: `928b8e2` (migration), `1ec0e58` (offline tools + stale wording), `6e0a
 
 ---
 
+### 0.4 Kronos Shadow Gate — FIRST VERDICT at N=81 (2026-09-14 07:00 IST)
+
+**Context.** The Kronos shadow worker (§0.2.7–0.2.8) has been scoring every live CSM candidate since 2026-09-11 with `would_gate = pred_fav >= 0.020` — the threshold validated in the original backtest and **fixed before any of these trades happened**. `enrich_ablation.py` defers until ≥80 executed CSM trades can be matched to a Kronos verdict. That bar was crossed today (dashboard progress panel showed 81/80). Production `.env`-era config: Config A (§17.29), `MAX_CONCURRENT=3`, `MAX_PER_STRATEGY=CSM:3,NASOS_V4:2,ELLIOT_V8:1`.
+
+**Run 1 — `kronos/enrich_ablation.py` (5-fold CV logistic AUC):**
+```
+labelled (signal x outcome): 93
+  CSM: 83   matched to Kronos: 81 (98% of CSM)
+  matched win rate 44.4%   pred_fav med +0.0162
+== ABLATION (N=81) ==
+  pred_fav/dir/adv ALONE : AUC 0.697
+  27 base features       : AUC 0.624
+  base + Kronos          : AUC 0.646   dAUC +0.022
+```
+- dAUC +0.022 clears the script's own bar, but at N=81 it is inside the noise — "promising", not "proven".
+- The stronger line: **Kronos alone (3 features, AUC 0.697) out-ranks the ML engine's 27 base features (0.624).**
+- Combined < Kronos-alone is the small-N signature (30 features on 81 rows; the logistic fit overfits the base features and dilutes the Kronos signal). Modelling artefact, not evidence against Kronos.
+
+**Run 2 — what the gate would have DONE (split of the same 81 trades by `would_gate`; pnl = `pnl_equity_pct`):**
+
+| | N | Win | PF | Sum | Mean/trade |
+|---|---|---|---|---|---|
+| All 81 CSM trades | 81 | 44.4% | 0.92 | −0.88% | −0.011% |
+| **Kronos PASS** (pred_fav ≥ 0.020) | 31 | 54.8% | **1.75** | **+2.48%** | +0.080% |
+| **Kronos BLOCKED** | 50 | 38.0% | **0.55** | −3.36% | −0.067% |
+
+Over this window CSM was net negative; the gate would have removed the 50 trades carrying essentially all of the loss and kept 31 that were net positive. Because the 0.020 cutoff was pre-registered, this is an honest out-of-sample reading, not a fit.
+
+**Why NOT flipped live yet.** N=31 on the pass side — PF 1.75 can move a lot on three or four different outcomes. Direction convincing; magnitude not yet.
+
+**Pre-registered decision rule (do not move the goalposts later).**
+1. Robustness check now: re-split at thresholds 0.010 / 0.015 / 0.025 / 0.030 — PASS-PF must stay > BLOCKED-PF monotonically; and drop the single best passed trade — PF must survive.
+2. **Second reading at N ≈ 120 matched** (around when the whale collector also reaches its 120). If PASS PF ≥ 1.3 **and** BLOCKED PF ≤ 0.9 again, two independent readings agree → implement a live gate.
+3. Implementation when justified: `KRONOS_GATE` = `off | shadow | live` as a hot-reloaded `settings.json` key, so it can be pulled back within one cycle without a restart. Not built until the rule above passes.
+4. If the second reading fails the rule, Kronos stays observe-only and this section records why.
+
+Split command (re-run for the second reading):
+```bash
+kronos/venv/bin/python -c "
+import json
+rows=[json.loads(l) for l in open('kronos/logs/ml_kronos_enriched.jsonl')]
+rows=[r for r in rows if r['strategy']=='CSM' and r.get('kronos')]
+def stats(s):
+    w=sum(r['pnl'] for r in s if r['pnl']>0); l=-sum(r['pnl'] for r in s if r['pnl']<=0)
+    return f\"N={len(s):3d}  win={100*sum(r['win'] for r in s)/len(s):5.1f}%  PF={w/l if l else float('inf'):.2f}  sum={100*sum(r['pnl'] for r in s):+.2f}%  mean={100*sum(r['pnl'] for r in s)/len(s):+.3f}%\" if s else 'N=0'
+g=[r for r in rows if r['kronos']['would_gate']]; b=[r for r in rows if not r['kronos']['would_gate']]
+print('ALL          ', stats(rows)); print('GATE PASS    ', stats(g)); print('GATE BLOCKED ', stats(b))
+"
+```
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-12. Sections below this point may use earlier parameter values
