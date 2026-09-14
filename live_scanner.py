@@ -1121,9 +1121,12 @@ def _scan_for_signals(
                 elif sig.get("strength", 1.0) >= MIN_STRENGTH:
                     candidates.append(sig)
                     if _sid == "CSM":
+                        # Queued now so the worker can score it while the
+                        # rest of the scan runs; _kronos_gate() looks the
+                        # score up by this ts at entry time.
                         try:
                             from kronos.shadow_client import log_candidate
-                            log_candidate(
+                            sig["kronos_ts"] = log_candidate(
                                 sig.get("symbol"),
                                 sig.get("direction"),
                                 sig.get("entry_price"),
@@ -1144,6 +1147,80 @@ def _scan_for_signals(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Kronos gate
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The Kronos worker (kronos/shadow_worker.py, own venv, own process) scores
+# every CSM candidate the scan queues. With KRONOS_GATE=live a CSM entry is
+# skipped when its pred_fav is below KRONOS_PF_THR. Evidence and the decision
+# rule are in docs/EXPERIMENT_LOG.md 0.4 (N=81: blocked set PF 0.55).
+#
+# FAIL-OPEN by design: no score within KRONOS_GATE_WAIT_SEC (worker down,
+# model reloading, insufficient context) means the entry proceeds exactly as
+# before the gate existed, and no further waiting happens that cycle so a dead
+# worker costs one timeout, not one per signal.
+
+_kronos_gated_notified: dict[str, datetime] = {}
+
+
+def _kronos_gate(sig: dict, waited_out: dict) -> bool:
+    """True = entry may proceed. Only CSM signals are ever gated."""
+    if sig.get("strategy") != "CSM":
+        return True
+    mode = cfg.get("KRONOS_GATE")
+    if mode == "off":
+        return True
+
+    sym, ts = sig.get("symbol"), sig.get("kronos_ts")
+    score = None
+    if ts:
+        try:
+            from kronos.shadow_client import wait_for_score
+            wait = 0 if waited_out.get("hit") else cfg.get("KRONOS_GATE_WAIT_SEC")
+            score = wait_for_score(sym, ts, wait)
+        except Exception as exc:
+            log.warning(f"[KRONOS] score lookup failed [{sym}]: {exc}")
+
+    if score is None or score.get("err") or score.get("pred_fav") is None:
+        if not waited_out.get("hit"):
+            waited_out["hit"] = True
+            log.warning(
+                f"[KRONOS] no score for {sym} within "
+                f"{cfg.get('KRONOS_GATE_WAIT_SEC')}s "
+                f"({(score or {}).get('err', 'worker silent')}) — fail-open, "
+                f"not waiting again this cycle"
+            )
+        sig["kronos_pred_fav"] = None
+        return True
+
+    pf  = float(score["pred_fav"])
+    thr = cfg.get("KRONOS_PF_THR")
+    sig["kronos_pred_fav"] = pf
+    if pf >= thr:
+        log.info(f"[KRONOS] {sym} pred_fav={pf:+.4f} >= {thr:.3f} — pass")
+        return True
+
+    if mode == "shadow":
+        log.info(f"[KRONOS] shadow: {sym} pred_fav={pf:+.4f} < {thr:.3f} — "
+                 f"would gate, trading anyway")
+        return True
+
+    log.info(f"[KRONOS] GATED {sym} {sig.get('direction')} pred_fav={pf:+.4f} "
+             f"< {thr:.3f} — entry skipped")
+    # One notification per symbol per hour — a symbol can re-signal every
+    # scan while it stays in the momentum band.
+    now = datetime.now(timezone.utc)
+    last = _kronos_gated_notified.get(sym)
+    if last is None or (now - last).total_seconds() > 3600:
+        _kronos_gated_notified[sym] = now
+        notify_error(
+            f"🔬 Kronos gated {sym} {sig.get('direction')}\n"
+            f"pred_fav {pf:+.4f} < {thr:.3f} — CSM entry skipped"
+        )
+    return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Entry execution
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1160,6 +1237,7 @@ def _execute_entries(
     ML engine called per signal for feature logging and adaptive sizing.
     """
     entries = 0
+    _kronos_waited_out: dict = {}    # one scoring timeout per cycle, see _kronos_gate
 
     # Regime age (for ML features)
     regime_age_min = (
@@ -1200,6 +1278,9 @@ def _execute_entries(
         if live.is_symbol_active(sig["symbol"]):
             continue
 
+        # ── Kronos gate (CSM only; see _kronos_gate) ─────────────────────────
+        if not _kronos_gate(sig, _kronos_waited_out):
+            continue
 
         # ── LLM Advisor Veto — DISABLED ──────────────────────────────────────
         # Removed: The 15-min stale LLM bias was vetoing valid early breakout

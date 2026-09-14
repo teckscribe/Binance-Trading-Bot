@@ -175,6 +175,20 @@ SPEC = [
        "Time exit for the freqtrade ports. 0 = off (historical behaviour).",
        min=0, max=10080),
 
+    # ── Kronos gate ──────────────────────────────────────────────────────────
+    _s("KRONOS_GATE", "Kronos", "choice", "live", "Kronos gate mode",
+       "off = ignore Kronos. shadow = log what would be gated, trade anyway. "
+       "live = skip CSM entries whose pred_fav is below the threshold. "
+       "If no score arrives in time the entry proceeds (fail-open).",
+       options=["off", "shadow", "live"]),
+    _s("KRONOS_PF_THR", "Kronos", "float", 0.025, "Kronos pred_fav threshold",
+       "CSM entry needs pred_fav >= this. First live reading (N=81, "
+       "2026-09-14): 0.020 PASS PF 1.75 / BLOCKED 0.55; 0.025 PASS PF 3.96 "
+       "(N=19). See EXPERIMENT_LOG 0.4.", min=0.0, max=0.2, step="0.001"),
+    _s("KRONOS_GATE_WAIT_SEC", "Kronos", "int", 8, "Max wait for a score (s)",
+       "How long the entry step waits for the shadow worker to score a "
+       "candidate before proceeding without it.", min=0, max=60),
+
     # ── Machine learning ─────────────────────────────────────────────────────
     _s("ML_PHASE", "ML", "int", 1, "ML phase", min=1, max=4),
     _s("ML_SHADOW", "ML", "bool", True, "ML shadow mode",

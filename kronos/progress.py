@@ -9,6 +9,7 @@ ones enrich_ablation.py (Kronos) and whale_analyze.py (whale) use, so the
 "matched" figure here is exactly the N those tools will report.
 """
 import os
+import sys
 import json
 from datetime import datetime, timezone
 
@@ -165,8 +166,18 @@ def progress() -> dict:
             d.update(extra)
         return d
 
+    gate = {"mode": "unknown", "threshold": None, "wait_sec": None}
+    try:
+        sys.path.insert(0, _ROOT)
+        from modules import settings_manager as cfg
+        gate = {"mode": cfg.get("KRONOS_GATE"), "threshold": cfg.get("KRONOS_PF_THR"),
+                "wait_sec": cfg.get("KRONOS_GATE_WAIT_SEC")}
+    except Exception:
+        pass
+
     return {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "gate": gate,
         "queue": {"candidates": len(queue), "last_ts": _last(queue, "ts")},
         "csm_trades_with_outcome": len(trades),
         "kronos": block(k_matched, KRONOS_TARGET, len(k_ok), k_err,

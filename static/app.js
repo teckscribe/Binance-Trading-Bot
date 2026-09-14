@@ -818,6 +818,13 @@ async function fetchKronosProgress() {
         if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
         kpFill("k", d.kronos);
         kpFill("w", d.whale);
+        const g = document.getElementById("kp-gate");
+        if (g && d.gate) {
+            const m = d.gate.mode || "unknown";
+            g.textContent = m === "live" ? `LIVE · thr ${d.gate.threshold}`
+                          : m === "shadow" ? `SHADOW · thr ${d.gate.threshold}` : m.toUpperCase();
+            g.className = "pill " + (m === "live" ? "pill-green" : "pill-amber");
+        }
         const q = document.getElementById("kp-q"); if (q) q.textContent = d.queue.candidates;
         const t = document.getElementById("kp-trades"); if (t) t.textContent = d.csm_trades_with_outcome;
         if (upd) upd.textContent = `updated ${kpFmtTs(d.generated)}`;

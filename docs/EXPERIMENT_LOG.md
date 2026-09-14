@@ -148,11 +148,31 @@ Over this window CSM was net negative; the gate would have removed the 50 trades
 
 **Why NOT flipped live yet.** N=31 on the pass side — PF 1.75 can move a lot on three or four different outcomes. Direction convincing; magnitude not yet.
 
+**Robustness check (same 81 trades, 2026-09-14 08:10 IST):**
+
+| thr | PASS | BLOCKED |
+|---|---|---|
+| 0.010 | N=56 PF 1.15 | N=25 **PF 0.28** |
+| 0.015 | N=44 PF 1.02 | N=37 PF 0.75 |
+| 0.020 | N=31 PF 1.75 | N=50 PF 0.55 |
+| 0.025 | N=19 PF 3.96 | N=62 PF 0.57 |
+| 0.030 | N=16 PF 3.56 | N=65 PF 0.62 |
+
+PASS without best trade: N=30 PF 1.15; without best 2: PF 1.03.
+
+Reading: PASS > BLOCKED at **every** threshold, and the lowest-scored trades are the worst of all (bottom 25 by `pred_fav`: PF 0.28) — the loser-detection is robust. The PASS-side profit is NOT: +2.48% is mostly one trade (PF 1.75 → 1.15 without it). Honest statement: **Kronos is a better loser-detector than winner-picker.** Expect the gate to stop CSM bleeding (PF 0.92 → ~1.0–1.15 with ~40% fewer trades), not to make it strongly profitable.
+
+**DECISION (operator, 2026-09-14): gate goes LIVE at threshold 0.025.** Rationale for not waiting: a gate can only *block* trades, never open one, so being wrong costs missed trades, not capital; the un-gated strategy was net negative over this window, so waiting 40 more trades has a real cost; the switch is hot-reloadable and reverses in one cycle. Caveat recorded: 0.025 was chosen after seeing this sample (0.020 was the pre-registered value), so its PF 3.96 (N=19) is optimistic — the next reading is the honest test of 0.025. Operator intent: "after checking the result we can reduce" toward 0.020.
+
+**Implementation (commit below):** `KRONOS_GATE` = `off | shadow | live` (default live), `KRONOS_PF_THR` (default 0.025), `KRONOS_GATE_WAIT_SEC` (default 8) — all hot in `data/settings.json`. `live_scanner._kronos_gate()` runs in `_execute_entries()` after the risk gates for CSM signals only: looks up the shadow worker's score for that exact candidate (`kronos/shadow_client.find_score` / `wait_for_score`, keyed on the `ts` the scan queued), skips the entry when `pred_fav < thr` in `live`, logs only in `shadow`. **Fail-open:** no score within `WAIT_SEC` (worker down, model reloading, `insufficient_context`) → the entry proceeds as before, and no further waiting that cycle. One Telegram/Discord notification per gated symbol per hour. The Kronos worker process is unchanged. Dashboard progress panel shows the gate mode and threshold.
+
+**Measurement consequence:** with the gate live, blocked candidates never execute, so BLOCKED-PF can no longer be measured from live trades. The next reading compares gated-CSM PF (all executed CSM trades from 2026-09-14 on) against this pre-gate baseline (PF 0.92, mean −0.011%/trade, N=81). The shadow log still scores every candidate, so the threshold sweep can be repeated on the growing candidate set.
+
 **Pre-registered decision rule (do not move the goalposts later).**
-1. Robustness check now: re-split at thresholds 0.010 / 0.015 / 0.025 / 0.030 — PASS-PF must stay > BLOCKED-PF monotonically; and drop the single best passed trade — PF must survive.
-2. **Second reading at N ≈ 120 matched** (around when the whale collector also reaches its 120). If PASS PF ≥ 1.3 **and** BLOCKED PF ≤ 0.9 again, two independent readings agree → implement a live gate.
-3. Implementation when justified: `KRONOS_GATE` = `off | shadow | live` as a hot-reloaded `settings.json` key, so it can be pulled back within one cycle without a restart. Not built until the rule above passes.
-4. If the second reading fails the rule, Kronos stays observe-only and this section records why.
+1. ~~Robustness check~~ — done above; passed on loser-detection, failed on winner-size.
+2. **Next reading after ≥ 40 gated CSM trades** (executed with the gate live). Keep the gate if their PF ≥ 1.1 and mean/trade > the pre-gate baseline (−0.011%). If gated-CSM PF < 0.9, the gate is not helping live: set `KRONOS_GATE=shadow` and record why.
+3. Threshold changes only at a reading, never mid-sample; lowering toward 0.020 is the stated direction if 0.025 looks too tight (too few trades).
+4. Repeat the threshold sweep on the full candidate set at each reading — it does not need executed trades.
 
 Split command (re-run for the second reading):
 ```bash

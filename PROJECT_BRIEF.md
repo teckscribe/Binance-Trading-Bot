@@ -154,3 +154,6 @@ The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) 
 ### Kronos Shadow Gate — First Verdict — 2026-09-14 07:00 IST
 31. **Kronos reached its verdict threshold (81/80 matched CSM trades)**. Ablation: Kronos-alone AUC 0.697 vs ML 27-feature AUC 0.624; base+Kronos dAUC +0.022. Gate split of the same 81 live trades (pre-registered 0.020 threshold): PASS N=31 PF 1.75 (+2.48%), BLOCKED N=50 PF 0.55 (−3.36%), ALL PF 0.92. **Not flipped live** — second reading required at N≈120 (PASS PF ≥ 1.3 and BLOCKED PF ≤ 0.9) before a hot-reloadable `KRONOS_GATE` setting is built. Full numbers, robustness checks and decision rule: EXPERIMENT_LOG §0.4.
 
+### Kronos Gate LIVE — 2026-09-14 08:30 IST
+32. **Kronos gate switched on** (`KRONOS_GATE=live`, `KRONOS_PF_THR=0.025`, `KRONOS_GATE_WAIT_SEC=8`, all hot in `settings.json`). Robustness sweep on the 81-trade sample: PASS > BLOCKED at every threshold 0.010–0.030, bottom-25 candidates PF 0.28 — loser-detection robust; PASS-side profit concentrated in one trade. CSM entries with `pred_fav` below threshold are skipped; no score within 8s → fail-open. Kronos worker unchanged. Next reading after ≥40 gated trades. EXPERIMENT_LOG §0.4.
+
