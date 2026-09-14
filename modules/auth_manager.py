@@ -51,6 +51,12 @@ _adapter = HTTPAdapter(pool_connections=30, pool_maxsize=30)
 SESSION.mount("https://", _adapter)
 SESSION.mount("http://", _adapter)
 
+# Weight-aware throttle: every SESSION call is gated against Binance's
+# 2400/min request-weight budget and fed back the X-MBX-USED-WEIGHT-1M
+# header. See modules/rate_budget.py for why this exists.
+from modules.rate_budget import install as _install_rate_budget
+_install_rate_budget(SESSION)
+
 API_KEY    = os.getenv("BINANCE_API_KEY",    "")
 API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 
