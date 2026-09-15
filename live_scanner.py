@@ -503,6 +503,7 @@ _ENTRY_SETTINGS_KEYS = (
     "MAX_PER_STRATEGY", "KRONOS_GATE", "KRONOS_PF_THR",
     "CSM_MOM_LO", "CSM_MOM_HI", "CSM_SL_ATR_LONG", "CSM_SL_ATR_SHORT",
     "CSM_TP_ATR_LONG", "CSM_TP_ATR_SHORT", "CSM_PROFIT_LADDER", "CSM_MAX_HOLD_MIN",
+    "CSM_BEAR_LONG_MAX_AGE_MIN",
     "NASOS_SL_MODE", "NASOS_SL_FLAT", "NASOS_TP_ATR",
 )
 
@@ -1404,6 +1405,23 @@ def _execute_entries(
 
         # ── Kronos gate (CSM only; see _kronos_gate) ─────────────────────────
         if not _kronos_gate(sig, _kronos_waited_out):
+            continue
+
+        # ── CSM BEAR_TREND LONG age gate ─────────────────────────────────────
+        # Suppress new CSM LONG entries when the market has been in a sustained
+        # downtrend beyond the configured threshold. SHORTs are unaffected.
+        _bear_long_max = cfg.get("CSM_BEAR_LONG_MAX_AGE_MIN")
+        if (
+            _bear_long_max > 0
+            and sig.get("strategy") == "CSM"
+            and sig.get("direction") == "LONG"
+            and regime.get("regime") == "BEAR_TREND"
+            and regime_age_min > _bear_long_max
+        ):
+            log.info(
+                f"[{sig['symbol']}] CSM LONG skipped — BEAR_TREND "
+                f"{regime_age_min:.0f}min > {_bear_long_max}min limit"
+            )
             continue
 
         # ── LLM Advisor Veto — DISABLED ──────────────────────────────────────

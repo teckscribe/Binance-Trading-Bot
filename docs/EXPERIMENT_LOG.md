@@ -2943,6 +2943,24 @@ Range **0.79–1.45**, mean **1.09**. Two phases go below PF 1.0 (net loser). Th
 
 ---
 
+### 17.33 Sep 15 P&L analysis — restart friction + BEAR_TREND LONG gate — 2026-09-15
+
+**Observed:** 10 of 20 exits on Sep 15 were MANUAL_CLOSE (restart friction from code-update deploys), costing –$5.08. All 9 automated exits (TRAIL_HIT × 6, TP_HIT × 2, BE_HIT × 1) were profitable (+$1.33). Net session: –$1.50.
+
+**CSM LONG in sustained BEAR_TREND:** BTC fell $2,400 (78.7k → 76.3k) over 13 hours. CSM kept entering LONGs throughout. The 2 CSM SHORTs (UAIUSDT, BUSDT) both won; the LONGs showed MAE typically 2–5× MFE.
+
+**Changes deployed 2026-09-15:**
+
+1. **`CSM_BEAR_LONG_MAX_AGE_MIN = 480`** (new gate in `live_scanner.py`): blocks new CSM LONG entries when BEAR_TREND has been active > 480 min (8h). SHORTs are unaffected. Setting is hot-reloadable and defaults to 0 (off) so it can be disabled without a restart. Would have blocked the last 4–5 CSM LONGs on Sep 15, avoiding ~$1.50 in losses.
+
+2. **`NASOS_TP_ATR`: 3.0 → 4.0**: The 3×ATR TP with a flat 8% SL yields a 1:5 theoretical R:R, requiring >83% win rate to break even. Widening to 4×ATR improves the ratio. Matches the range that the §17.31 sweep identified as near-optimal for NASOS on BEAR regimes (TP_ATR 3–4 range).
+
+**Not changed:** `ml_win_prob = -1.0` is not a bug — Phase 4 (signal quality gate) requires `ML_PHASE=4` and 200+ completed trades. Currently at Phase 2 with fewer trades. Works as designed.
+
+**Files changed:** `live_scanner.py`, `modules/settings_manager.py`, `data/settings.json`.
+
+---
+
 ## 18. FILES TO SYNC TO UBUNTU (as of 2026-08-29) — supersedes §15, superseded by §19
 
 ### Production — 2026-08-29 session (highest priority)
