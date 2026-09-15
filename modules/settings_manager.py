@@ -163,10 +163,6 @@ SPEC = [
        "0 = off.", min=0.0, max=20, step="0.1"),
     _s("CSM_LEGACY_BE", "CSM", "bool", False, "Legacy breakeven",
        "Only used when the ladder is off."),
-    _s("CSM_BEAR_LONG_MAX_AGE_MIN", "CSM", "int", 0, "Max BEAR_TREND age for CSM LONGs (min)",
-       "Block new CSM LONG entries when BEAR_TREND has been active longer than this many minutes. "
-       "0 = off (no blocking). 480 = 8h. SHORTs are unaffected.",
-       min=0, max=10080),
 
     # ── NASOS ────────────────────────────────────────────────────────────────
     _s("NASOS_SL_MODE", "NASOS", "choice", "flat", "Stop mode",
