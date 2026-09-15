@@ -244,6 +244,8 @@ Rejected: `get_oi_trend()` "dead" — used by `trend_pullback.py`, kept for `bac
 
 Poll is `os.path.getsize()` on the queue file — no network. Worker kline load is per candidate (3.65/min ≈ 7 weight/min) and unchanged. Which candidates pass/fail is unchanged; ~6 % more cycles get a verdict instead of falling open. The residual 8.5 % is per-candidate scoring time (~1.2 s) on bursts of 6+ where the top pick sits deep in a queue written in scan order; the fix would be to queue in rank order — deferred until journal `fail-open` counts over a week show it matters. Deploy: copy unit, `daemon-reload`, restart `kronos-shadow`.
 
+**0.5.16 Kronos model revision pinned (2026-09-15 00:15 IST).** Operator asked whether an HF token was needed (no — public MIT weights, cached locally, no auth at score time) and whether a token would auto-update the model (no — but the unpinned `from_pretrained()` already *would*: it resolves `main` on every worker start). Pinned in `scorer.py`: model `901c26c1332695a2a8f243eb2f37243a37bea320`, tokenizer `0e0117387f39004a9016484a186a908917e22426` — the HF `sha` of both repos at time of pinning, last modified 2025-09-09, i.e. before shadow logging began on 2026-09-11, and identical to the snapshot directories in the dev machine's HF cache. So the entire shadow dataset, the N=81 verdict and the 0.025 threshold are on exactly these weights. Verified `HF_HUB_OFFLINE=1` load from cache: 5.9 s, no network. `KRONOS_REVISION` / `KRONOS_TOKENIZER_REVISION` env overrides exist for evaluating a future release in shadow before adopting it (which would mean re-running §0.4 and re-deriving the threshold). Worker prints `weights: model@… tokenizer@…` at start.
+
 ---
 
 ## 1. CURRENT STATE
@@ -3072,7 +3074,7 @@ cd /home/psms/ubuntu/program_files/csb && git pull && sudo systemctl restart csb
 | `live_logger.py`, `modules/ml_engine.py` | Context keys on EXIT records and outcome rows | §0.5.3 |
 | `telegram_notifier.py`, `discord_notifier.py`, `telegram_bot.py`, `discord_bot.py` | Kronos/regime lines; ELLIOT removed; dead handlers removed | §0.5.3, §0.5.7, §0.5.9 |
 | `web_server.py`, `static/*` | `/api/kronos/progress`, Kronos/Whale panel, Kronos + Regime columns | §0.4, §0.5.8 |
-| `kronos/shadow_worker.py`, `kronos/progress.py`, `kronos/kronos-shadow.service` | Threshold removed from the worker; would-pass derived at the live threshold; **copy the unit + daemon-reload + restart kronos-shadow** | §0.5.14 |
+| `kronos/shadow_worker.py`, `kronos/progress.py`, `kronos/kronos-shadow.service`, `kronos/scorer.py` | Threshold removed from the worker; would-pass derived at the live threshold; poll 2 s; weights pinned; **copy the unit + daemon-reload + restart kronos-shadow** | §0.5.14–16 |
 | `modules/regime_engine.py`, `modules/risk_engine.py`, `modules/strategies/strategy_factory.py` | ELLIOT removed; SMA port deleted | §0.5.7, §0.5.9 |
 | `modules/strategies/base_strategy.py`, `modules/strategies/freqtrade_port_nasos.py` | `hold_minutes()` added (crash fix behind `PORT_MAX_HOLD_MIN`); dead leverage key; `_to_5m()` | §0.5.11 |
 | **Deleted:** `modules/strategies/freqtrade_port_elliot.py`, `modules/strategies/freqtrade_port_sma.py` | | §0.5.7, §0.5.9 |
