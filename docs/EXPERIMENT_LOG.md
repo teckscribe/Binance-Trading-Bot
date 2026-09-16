@@ -263,6 +263,25 @@ Worker latency also tracks load, which §0.5.17's 09-11→09-14 window understat
 
 Consequence for `KRONOS_GATE_WAIT_SEC`: rank order does most of the work the longer wait was buying. At 10 s the top-ranked fail-open rate is 0.2 % with rank order versus 5.7 % without — i.e. rank-order @10 s beats scan-order @20 s, at half the worst-case stall. Operator set 10 s on this basis (2026-09-16). Re-read both numbers at the §0.4 N=40 gate reading.
 
+**0.5.19 Enricher re-run + CSM Kronos ablation; "share klines with the worker" ruled out for now (2026-09-16).**
+
+*Enricher was 2 days stale.* `ml_kronos_enriched.jsonl` held 93 rows (83 CSM / 10 NASOS) with **0 % of NASOS rows carrying a Kronos score** — not a join bug: all 10 NASOS trades in the file predated 09-14, the date NASOS_V4 was added to `KRONOS_SHADOW_STRATEGIES`, so trades and scores had no overlap. `enrich_ablation.py` is a manual offline rig; re-running it on the server closed the gap:
+
+| | trades | matched to Kronos | win | pred_fav median |
+|---|---|---|---|---|
+| CSM | 123 | 121 (98 %) | 50.4 % | +0.0225 |
+| NASOS_V4 | 29 | 13 (45 %) | 61.5 % | +0.0358 |
+
+NASOS ablation deferred — needs ≥ 80 matched rows, has 13. **Re-run the enricher at each gate reading; it does not update itself.**
+
+*CSM ablation (5-fold CV logistic AUC, N=121).* Kronos alone **0.618**; 27 base ML features **0.630**; base + Kronos **0.621**, **dAUC −0.009** against the rig's own +0.02 bar. Kronos carries real standalone signal (0.618 vs 0.5) but adds nothing on top of the base features — it is largely re-deriving what they already see. Two caveats before this is used to demote anything: N=121 over 5 folds is ~24 rows/fold, so ±0.01 is noise; and ML sits at Phase 2, gating nothing live, so Kronos is currently doing work ML is not. This is supplementary to the §0.4 rule, which decides on gated-CSM PF, not AUC.
+
+*"Share the scanner's 15m klines with the worker" — not feasible as-is.* Proposed to cut the worker's 1–2 s per-candidate Binance fetch off the entry path. Blocked: `scorer._LB_DEFAULT = 256` and `score_window()` returns `None` when `len(ctx15) < 256`, but `data_hub._fetch_symbol()` fetches 15m at `limit=200`. Passing that frame through would return `insufficient_context` on **every** candidate — fail-open on 100 % of entries. The 1m route is worse: `leakfree_ctx15` needs 256 × 15 = 3,840 minutes of 1m against the scanner's 200–1500.
+
+Two corrections to claims made while scoping it. (a) API cost: Binance kline weight is bucketed (101–500 bars = weight 2), so raising the scanner 200 → 280 costs **no** extra weight, and dropping the worker's requests lowers request count — the rate-budget argument favours the change, not against it. (b) Decalibration risk is **lower** than first stated: both sides pull the same canonical Binance bars, so after a correct leak-free trim the context should be byte-identical, not merely similar.
+
+Deferred rather than rejected. It needs the scanner's 15m depth raised to ~280 on every scanned symbol plus a ~20 KB/candidate transport across the venv boundary, and §0.5.18's rank-order fix already took top-candidate fail-open from 5.7 % to 0.2 % at 10 s for free. **Revisit only if Kronos survives the §0.4 N=40 reading** (24 gated exits as of this entry) — if the gate is demoted to shadow there, this is dead work.
+
 ---
 
 ## 1. CURRENT STATE
