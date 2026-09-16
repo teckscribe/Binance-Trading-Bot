@@ -248,6 +248,21 @@ Poll is `os.path.getsize()` on the queue file — no network. Worker kline load 
 
 **0.5.17 `KRONOS_GATE_WAIT_SEC` 8 → 20 (operator, 2026-09-15 ~00:30 IST, via settings.json; hot).** Same 2,702-burst simulation with the 2 s poll: fail-open (top-ranked CSM candidate unscored) 8.5 % @8 s → 2.4 % @12 → 0.7 % @15 → **0.0 % @20**. Cost: the scan loop is single-threaded, so on the 8.5 % of cycles where the score takes >8 s the fast cycle (trail/BE/TP software checks) is paused for up to 20 s instead of 8; exchange `STOP_MARKET` protects throughout; median stall unchanged at 3.6 s. Accepted — a verdict on every CSM entry outweighs a late trail nudge on a minority of cycles. Note for the second gate reading (§0.4 rule): from this point every gated CSM trade has a score, so "gated" = "scored" in the journal counts. Also: Antigravity commit `0224fd2` carried the §0.5.16 scorer/worker pin (identical to the tested patch) and the `strategy_overrides.json` ELLIOT removal; `5fa182f` added the docs.
 
+**0.5.18 Kronos candidates queued in rank order (2026-09-16).** §0.5.15 named this as the real fix and deferred it "until journal `fail-open` counts over a week show it matters." That condition is now met: two CSM entries on 09-16 executed fail-open, and one was a genuine gate bypass — FLOCKUSDT SHORT 15:09:53, entered 15:10:00.97 with `kronos_pred_fav=null`, its score landing at 15:10:01 at **pred_fav 0.0064**, far below the 0.025 threshold. It should have been blocked and was not.
+
+Cause: `_scan_for_signals()` called `log_candidate()` inside the per-symbol scan loop, i.e. in **scan order**, but sorted `candidates` by strength only afterwards, and `_execute_entries()` walks that sorted list strongest-first. The worker scores strictly in queue order, so the one candidate that actually executes was routinely queued behind weaker ones that never trade. Fix: the `log_candidate()` loop moved below `candidates.sort(...)`. Same candidates, same scores, same worker — only the order changes. Cost: the worker loses the tail of the scan loop as head start (CPU-only work on already-fetched data, cycle total ~1.7 s).
+
+Measured on the full 13,694-row `shadow_scores.jsonl` (09-11 → 09-16), bursts defined as candidates queued within 5 s. 85.3 % of bursts hold more than one candidate and 96.9 % of all candidates sit in one, so this applies to nearly every cycle. Latency of the **top-ranked** candidate (the one that executes):
+
+| | median | mean | fail-open @8 s | @10 s | @20 s |
+|---|---|---|---|---|---|
+| scan order (was) | 5.0 s | 5.4 s | 12.7 % | 5.7 % | 0.2 % |
+| rank order (now) | 3.5 s | 3.7 s | **0.4 %** | **0.2 %** | **0.0 %** |
+
+Worker latency also tracks load, which §0.5.17's 09-11→09-14 window understated: median `scored_at − ts` by day 4.7 / 6.1 / 7.8 / 5.8 / 3.3 / 4.1 s for 09-11…09-16, worst on 09-13 (N=8097, p90 15.3 s). All-candidate fail-open @20 s is 0.2 %, not the 0.0 % §0.5.17 projected — directionally right, slightly optimistic.
+
+Consequence for `KRONOS_GATE_WAIT_SEC`: rank order does most of the work the longer wait was buying. At 10 s the top-ranked fail-open rate is 0.2 % with rank order versus 5.7 % without — i.e. rank-order @10 s beats scan-order @20 s, at half the worst-case stall. Operator set 10 s on this basis (2026-09-16). Re-read both numbers at the §0.4 N=40 gate reading.
+
 ---
 
 ## 1. CURRENT STATE

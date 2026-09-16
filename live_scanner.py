@@ -1235,21 +1235,6 @@ def _scan_for_signals(
                         near_misses[sid] = sig
                 elif sig.get("strength", 1.0) >= MIN_STRENGTH:
                     candidates.append(sig)
-                    if _sid in KRONOS_SHADOW_STRATEGIES:
-                        # Queued now so the worker can score it while the
-                        # rest of the scan runs; _kronos_gate() looks the
-                        # score up by this ts at entry time.
-                        try:
-                            from kronos.shadow_client import log_candidate
-                            sig["kronos_ts"] = log_candidate(
-                                sig.get("symbol"),
-                                sig.get("direction"),
-                                sig.get("entry_price"),
-                                sig.get("strength"),
-                                strategy=_sid,
-                            )
-                        except Exception:
-                            pass
             except Exception as exc:
                 log.warning(f"scan() exception [{sym} {strategy.STRATEGY_ID}]: {exc}")
 
@@ -1259,6 +1244,28 @@ def _scan_for_signals(
         log.info(f"[NEAR-MISS] {' | '.join(parts)}")
 
     candidates.sort(key=lambda s: s.get("strength", 1.0), reverse=True)
+
+    # Queue Kronos candidates AFTER the sort. The worker scores strictly in
+    # queue order and _execute_entries() tries candidates strongest-first, so
+    # queuing inside the scan loop left the candidate that actually executes
+    # waiting behind weaker ones — the cause of the 12-27s score latencies and
+    # the fail-open entries in EXPERIMENT_LOG 0.5.15 / 0.5.18. Cost: the worker
+    # loses the tail of the scan loop as head start (sub-2s, CPU-only work on
+    # already-fetched data); buys the top-ranked candidate first place in line.
+    for _c in candidates:
+        if _c.get("strategy") in KRONOS_SHADOW_STRATEGIES:
+            try:
+                from kronos.shadow_client import log_candidate
+                _c["kronos_ts"] = log_candidate(
+                    _c.get("symbol"),
+                    _c.get("direction"),
+                    _c.get("entry_price"),
+                    _c.get("strength"),
+                    strategy=_c.get("strategy"),
+                )
+            except Exception:
+                pass
+
     return candidates
 
 
