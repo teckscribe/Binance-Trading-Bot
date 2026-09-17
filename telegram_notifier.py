@@ -72,12 +72,16 @@ def notify_startup(regime: dict, n_symbols: int, n_scan: int = 0, permitted_stra
     # Single source: _STRATEGY_META above. The previous local copy listed only
     # 4 strategies AND filtered with `if s in _all_strats`, silently hiding any
     # strategy it didn't know (OIB never appeared in startup messages).
-    active = permitted_strategies or list(_STRATEGY_META)
+    # `is not None`, not `or`: an empty list means "nothing permitted" (every
+    # strategy /disabled, or none allowed in this regime) and must print as
+    # none. `or` treated [] as falsy and fell back to listing every strategy
+    # as active — the exact opposite of the truth.
+    active = permitted_strategies if permitted_strategies is not None else list(_STRATEGY_META)
     strat_lines = "\n".join(
         f"  {_STRATEGY_META.get(s, {}).get('emoji', '⚪')} {s} — "
         f"{_STRATEGY_META.get(s, {}).get('label', s)}"
         for s in active
-    ) or "  (none — waiting for regime)"
+    ) or "  (none — disabled or not permitted in this regime)"
 
     scan_note = f"{n_scan}" if n_scan > 0 else f"{n_symbols}"
     if n_symbols > n_scan > 0:
