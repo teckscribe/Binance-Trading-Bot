@@ -130,3 +130,41 @@ def reset(starting: float) -> None:
     log.info(f"Paper equity tracker reset to ${starting:.2f}")
 
 
+# ── LIVE mode baseline ───────────────────────────────────────────────────────
+# Binance reports the current balance but has no notion of where the period
+# started. Without persistence the scanner re-pinned the baseline to the
+# balance at every process start, so the dashboard's "total P&L" only ever
+# covered the minutes since the last restart — six restarts in a day made the
+# figure meaningless. This file is written once, from the Binance balance on
+# the first LIVE start, and read on every start after. Delete it to begin a
+# new period from the next start's balance.
+
+_LIVE_FILE = os.path.join(_PROJECT_DIR, "data", "live_equity.json")
+
+
+def live_baseline(current_balance: float) -> dict:
+    """Return {starting_equity, period_start} for LIVE mode, creating it from
+    `current_balance` if no baseline is on disk yet."""
+    try:
+        with open(_LIVE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if float(data.get("starting_equity", 0.0)) > 0:
+            return data
+    except Exception:
+        pass
+
+    data = {
+        "starting_equity": round(float(current_balance), 4),
+        "period_start":    datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        os.makedirs(os.path.dirname(_LIVE_FILE), exist_ok=True)
+        with open(_LIVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        log.info(f"Live equity baseline pinned from Binance: "
+                 f"${data['starting_equity']:.4f} USDT")
+    except Exception as exc:
+        log.warning(f"could not persist live baseline: {exc}")
+    return data
+
+

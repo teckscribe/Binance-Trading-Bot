@@ -1625,7 +1625,11 @@ def main() -> None:
         )
 
     # ── Establish starting equity ─────────────────────────────────────────────
-    # LIVE : Binance is the source of truth and already reflects realized P&L.
+    # LIVE : Binance is the source of truth for the CURRENT balance. The period
+    #        baseline the dashboard measures P&L against is persisted separately
+    #        (paper_equity.live_baseline) — setting it to the live balance here
+    #        re-pinned it on every restart, so "total P&L" only ever showed the
+    #        minutes since the last bounce.
     # PAPER: no exchange to ask, so apply the persisted simulated P&L on top of
     #        configured figure. Without this, paper equity never moved and a
     #        multi-day run showed no cumulative performance.
@@ -1634,8 +1638,11 @@ def main() -> None:
         if live_bal > 0:
             global PAPER_STARTING_EQUITY
             ACCOUNT_EQUITY = live_bal
-            PAPER_STARTING_EQUITY = live_bal
-            log.info(f"Account equity from Binance: ${ACCOUNT_EQUITY:.4f} USDT")
+            PAPER_STARTING_EQUITY = float(
+                paper_equity.live_baseline(live_bal)["starting_equity"]
+            )
+            log.info(f"Account equity from Binance: ${ACCOUNT_EQUITY:.4f} USDT "
+                     f"(period baseline ${PAPER_STARTING_EQUITY:.4f})")
         else:
             log.warning(
                 f"Could not fetch live balance — keeping configured value "

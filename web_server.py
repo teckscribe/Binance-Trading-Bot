@@ -189,7 +189,13 @@ async def get_recent_trades():
     # array — not JSONL. This previously read them line-by-line and filtered on
     # record["event"] == "TRADE_EXIT", but live_logger writes "type": "EXIT",
     # so every line failed to parse and the endpoint always returned empty.
-    for file in session_files[-3:]:
+    #
+    # Walk newest-first until LIMIT trades are collected, not a fixed number of
+    # files. Every restart opens a new session file, and a day with several
+    # restarts leaves the newest files holding 0-1 trades each — reading the
+    # last three showed a single trade on a day that had closed a dozen.
+    LIMIT = 50
+    for file in reversed(session_files):
         try:
             with open(file, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -197,10 +203,12 @@ async def get_recent_trades():
             continue
         if isinstance(data, dict):
             trades.extend(t for t in data.get("trades", []) if isinstance(t, dict))
+        if len(trades) >= LIMIT:
+            break
 
     # Sort by exit time descending. live_logger stamps each record as "time".
     trades.sort(key=lambda x: x.get("time", x.get("timestamp", "")), reverse=True)
-    return {"trades": trades[:50]}
+    return {"trades": trades[:LIMIT]}
 
 
 # ─── Performance analytics ───────────────────────────────────────────────────
@@ -236,13 +244,22 @@ def _current_period(trades: list) -> tuple:
          but it drifts if a close ever failed to reach the session log.
 
     Returns (scoped_trades, meta).
+
+    LIVE mode keeps its own baseline in live_equity.json (see
+    paper_equity.live_baseline). It takes precedence when present: the paper
+    file is frozen at whatever the last paper run left behind, so scoping a
+    live account by it mixed weeks of simulated trades into the live P&L.
     """
-    state_file = os.path.join(DATA_DIR, "paper_equity.json")
-    try:
-        with open(state_file, "r", encoding="utf-8") as f:
-            eq = json.load(f)
-    except Exception:
-        return trades, {"scope": "all", "reason": "no paper_equity.json"}
+    eq = None
+    for name in ("live_equity.json", "paper_equity.json"):
+        try:
+            with open(os.path.join(DATA_DIR, name), "r", encoding="utf-8") as f:
+                eq = json.load(f)
+            break
+        except Exception:
+            continue
+    if eq is None:
+        return trades, {"scope": "all", "reason": "no equity baseline file"}
 
     start = eq.get("period_start")
     count = int(eq.get("trades", 0) or 0)
