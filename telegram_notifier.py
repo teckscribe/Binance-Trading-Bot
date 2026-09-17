@@ -16,6 +16,7 @@ Credentials loaded from .env:
 """
 
 import os
+import html
 import requests
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -226,8 +227,11 @@ def notify_session_summary(live_summary: dict, regime: dict) -> None:
 
 
 def notify_error(msg: str) -> None:
-    """Send error alert."""
-    _send(f"\U0001f6a8 <b>Bot Error</b>\n{msg}")
+    """Send error alert. `msg` is plain text: _send() posts with parse_mode=HTML,
+    so a bare '<', '>' or '&' (e.g. "pred_fav -0.004 < 0.025", or a Binance
+    error string) makes Telegram reject the whole message with 400 and the
+    alert is silently lost. Every caller passes plain text, so escape here."""
+    _send(f"\U0001f6a8 <b>Bot Error</b>\n{html.escape(msg, quote=False)}")
 
 
 def notify_regime_change(old: str, new: str, regime: dict) -> None:
