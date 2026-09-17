@@ -1283,8 +1283,6 @@ def _scan_for_signals(
 # before the gate existed, and no further waiting happens that cycle so a dead
 # worker costs one timeout, not one per signal.
 
-_kronos_gated_notified: dict[str, datetime] = {}
-
 # Strategies whose candidates are queued for Kronos scoring (shadow data), and
 # the subset the live gate actually acts on. NASOS_V4 is shadow-only until it
 # has its own verdict — the 0.025 threshold was measured on CSM and does not
@@ -1336,18 +1334,12 @@ def _kronos_gate(sig: dict, waited_out: dict) -> bool:
                  f"would gate, trading anyway")
         return True
 
+    # Journal only. A block is the gate's normal outcome ~76% of the time
+    # (8-12 per cycle); the entry notification already reports what traded
+    # and shadow_scores.jsonl holds every verdict, so a per-block Telegram
+    # ping was pure noise and arrived labelled "Bot Error".
     log.info(f"[KRONOS] GATED {sym} {sig.get('direction')} pred_fav={pf:+.4f} "
              f"< {thr:.3f} — entry skipped")
-    # One notification per symbol per hour — a symbol can re-signal every
-    # scan while it stays in the momentum band.
-    now = datetime.now(timezone.utc)
-    last = _kronos_gated_notified.get(sym)
-    if last is None or (now - last).total_seconds() > 3600:
-        _kronos_gated_notified[sym] = now
-        notify_error(
-            f"🔬 Kronos gated {sym} {sig.get('direction')}\n"
-            f"pred_fav {pf:+.4f} < {thr:.3f} — CSM entry skipped"
-        )
     return False
 
 

@@ -282,6 +282,8 @@ Two corrections to claims made while scoping it. (a) API cost: Binance kline wei
 
 Deferred rather than rejected. It needs the scanner's 15m depth raised to ~280 on every scanned symbol plus a ~20 KB/candidate transport across the venv boundary, and §0.5.18's rank-order fix already took top-candidate fail-open from 5.7 % to 0.2 % at 10 s for free. **Revisit only if Kronos survives the §0.4 N=40 reading** (24 gated exits as of this entry) — if the gate is demoted to shadow there, this is dead work.
 
+**0.5.20 Per-block Kronos Telegram/Discord notification removed (operator, 2026-09-17).** §0.4 shipped "one Telegram/Discord notification per gated symbol per hour" via `notify_error`. It had never actually delivered: the text contains `< 0.025` and `_send()` posts as HTML, so Telegram rejected every one with 400 and the failure was only visible in the journal. Fixing the escaping (`f4d78fd`) unmasked it — 12 gated candidates in a single cycle at 15:47 IST, each arriving as "🚨 Bot Error". At the measured 76.5 % block rate that is 100+ pings a day for the gate's normal outcome. The entry notification already reports what traded and `shadow_scores.jsonl` holds every verdict, so the ping carried no information. Removed; the `[KRONOS] GATED …` journal line is unchanged. Per-symbol dedup dict went with it.
+
 ---
 
 ## 1. CURRENT STATE
