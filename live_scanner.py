@@ -1878,14 +1878,24 @@ def main() -> None:
                 # Union with open symbols: a position's symbol can drop out of
                 # the top-N watchlist while still open, and without its candles
                 # _manage_positions() cannot evaluate SL/TP for it that cycle.
-                if do_scan:
+                #
+                # Computed here, on the freshly classified regime, and reused
+                # for depth/1h below.
+                _permitted = StrategyFactory.get_permitted(
+                    regime, REGIME_STRATEGY_PERMISSIONS
+                )
+                if do_scan and _permitted:
                     scan_syms = list(symbols[:TOP_N_SYMBOLS])
                     scan_syms += [s for s in open_syms if s not in scan_syms]
                 else:
-                    # Slots are full, so there is nothing to scan FOR — but the
+                    # Nothing to scan FOR — slots are full, or no strategy is
+                    # permitted (regime matrix, or every one /disabled). The
                     # open positions still need full-depth data or the ports'
-                    # manage() cannot run. Fetch deep for those symbols only,
-                    # rather than sweeping the whole watchlist for no reason.
+                    # manage() cannot run, so fetch deep for those symbols
+                    # only. Sweeping the whole watchlist here cost ~1,900 of
+                    # the 2,400/min weight (150 symbols at NASOS's 1,500-bar
+                    # depth because one NASOS position was open) for a scan
+                    # that returned "No strategies permitted" a line later.
                     scan_syms = list(open_syms)
 
                 # Fetch 1h only if a strategy permitted THIS cycle actually
@@ -1898,9 +1908,6 @@ def main() -> None:
                 # (depth 200), so an open NASOS_V4 position got 200
                 # 1m bars -> 40 resampled 5m bars -> under the `< 55` guard ->
                 # unmanaged for the entire regime.
-                _permitted = StrategyFactory.get_permitted(
-                    regime, REGIME_STRATEGY_PERMISSIONS
-                )
                 _data_srcs = list(_permitted)
                 for _p in live.active:
                     _held = StrategyFactory.get(_p.get("strategy", ""))
