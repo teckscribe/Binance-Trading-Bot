@@ -112,11 +112,20 @@ def _live_enabled() -> bool:
 
 # ─── Systemctl helpers ────────────────────────────────────────────────────────
 
+def _is_active() -> bool:
+    try:
+        r = subprocess.run(["/usr/bin/systemctl", "is-active", SERVICE],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() == "active"
+    except Exception:
+        return False
+
+
 def _systemctl(action: str) -> tuple[bool, str]:
     try:
-        # stop needs longer timeout — graceful shutdown closes all positions
-        # restart = stop + start, so needs same 70s budget as stop alone
-        timeout = 70 if action in ("stop", "restart") else 20
+        # stop/restart wait for the scanner's graceful shutdown. The unit's own
+        # TimeoutStopSec is the real ceiling; this only needs to outlast it.
+        timeout = 120 if action in ("stop", "restart") else 20
         result = subprocess.run(
             ["/usr/bin/sudo", "/usr/bin/systemctl", action, SERVICE],
             capture_output=True, text=True, timeout=timeout,
@@ -125,7 +134,17 @@ def _systemctl(action: str) -> tuple[bool, str]:
             return True, f"systemctl {action} {SERVICE} → OK"
         return False, result.stderr.strip() or result.stdout.strip()
     except subprocess.TimeoutExpired:
-        return False, f"Command timed out after {timeout}s"
+        # A timeout here means WE stopped waiting, not that systemd failed.
+        # On 09-18 a stop that completed at 71s was reported as failed at 70s;
+        # the operator restarted a scanner that had already stopped cleanly.
+        # Ask systemd what actually happened before reporting.
+        active = _is_active()
+        if action == "stop" and not active:
+            return True, f"systemctl stop {SERVICE} → OK (completed after {timeout}s wait)"
+        if action in ("start", "restart") and active:
+            return True, f"systemctl {action} {SERVICE} → OK (completed after {timeout}s wait)"
+        return False, (f"Timed out after {timeout}s and service is "
+                       f"{'still active' if active else 'not active'} — check journalctl -u {SERVICE}")
     except Exception as exc:
         return False, str(exc)
 
@@ -1845,15 +1864,17 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
     elif data == "confirm_stop":
         await query.edit_message_text(
             "⏳ <b>Stopping scanner...</b>\n\n"
-            "Closing all open positions and writing session log.\n"
-            "<i>This may take up to 60 seconds — please wait.</i>",
+            "Finishing the current cycle and writing the session log.\n"
+            "Open positions stay open unless CLOSE_ON_SHUTDOWN is on.\n"
+            "<i>Please wait.</i>",
             parse_mode="HTML"
         )
         ok, msg = _systemctl("stop")
         if ok:
             await query.message.reply_text(
                 "⏹ <b>Scanner stopped.</b>\n"
-                "All positions closed. Session log written.",
+                "Session log written. Open positions (if any) are left on the "
+                "exchange with their stop orders until the next start.",
                 parse_mode="HTML", reply_markup=_main_keyboard(),
             )
         else:

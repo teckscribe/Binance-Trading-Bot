@@ -100,9 +100,18 @@ def _live_enabled() -> bool:
 
 # ─── Systemctl helpers ────────────────────────────────────────────────────────
 
+def _is_active() -> bool:
+    try:
+        r = subprocess.run(["/usr/bin/systemctl", "is-active", SERVICE],
+                           capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() == "active"
+    except Exception:
+        return False
+
+
 def _systemctl(action: str) -> tuple[bool, str]:
     try:
-        timeout = 70 if action in ("stop", "restart") else 20
+        timeout = 120 if action in ("stop", "restart") else 20
         result = subprocess.run(
             ["/usr/bin/sudo", "/usr/bin/systemctl", action, SERVICE],
             capture_output=True, text=True, timeout=timeout,
@@ -111,7 +120,15 @@ def _systemctl(action: str) -> tuple[bool, str]:
             return True, f"systemctl {action} {SERVICE} → OK"
         return False, result.stderr.strip() or result.stdout.strip()
     except subprocess.TimeoutExpired:
-        return False, f"Command timed out after {timeout}s"
+        # We stopped waiting; systemd may still have finished. Check before
+        # reporting a failure (see telegram_bot._systemctl for the incident).
+        active = _is_active()
+        if action == "stop" and not active:
+            return True, f"systemctl stop {SERVICE} → OK (completed after {timeout}s wait)"
+        if action in ("start", "restart") and active:
+            return True, f"systemctl {action} {SERVICE} → OK (completed after {timeout}s wait)"
+        return False, (f"Timed out after {timeout}s and service is "
+                       f"{'still active' if active else 'not active'} — check journalctl -u {SERVICE}")
     except Exception as exc:
         return False, str(exc)
 

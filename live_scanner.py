@@ -2100,7 +2100,18 @@ def main() -> None:
                 + (" | ".join(marks) if marks else "—")
             )
 
-        time.sleep(sleep_s)
+        # Sleep in 1s slices so SIGTERM is honoured within a second. The handler
+        # only sets _shutdown, and Python retries time.sleep() after a signal
+        # (PEP 475), so a single sleep(sleep_s) ran to completion first: with no
+        # positions open that is the full SCAN_INTERVAL, and a stop pressed just
+        # after a cycle took ~70s to land — long enough to trip the Telegram
+        # bot's timeout and report a clean stop as a failure.
+        _deadline = time.monotonic() + sleep_s
+        while not _shutdown:
+            _left = _deadline - time.monotonic()
+            if _left <= 0:
+                break
+            time.sleep(min(1.0, _left))
 
     # ── Graceful shutdown ─────────────────────────────────────────────────────
     log.info("Shutdown signal received — closing all positions...")
