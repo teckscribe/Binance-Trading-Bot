@@ -284,6 +284,36 @@ Deferred rather than rejected. It needs the scanner's 15m depth raised to ~280 o
 
 **0.5.20 Per-block Kronos Telegram/Discord notification removed (operator, 2026-09-17).** §0.4 shipped "one Telegram/Discord notification per gated symbol per hour" via `notify_error`. It had never actually delivered: the text contains `< 0.025` and `_send()` posts as HTML, so Telegram rejected every one with 400 and the failure was only visible in the journal. Fixing the escaping (`f4d78fd`) unmasked it — 12 gated candidates in a single cycle at 15:47 IST, each arriving as "🚨 Bot Error". At the measured 76.5 % block rate that is 100+ pings a day for the gate's normal outcome. The entry notification already reports what traded and `shadow_scores.jsonl` holds every verdict, so the ping carried no information. Removed; the `[KRONOS] GATED …` journal line is unchanged. Per-symbol dedup dict went with it.
 
+**0.5.21 §0.4 second reading — N=45, rule says demote, operator keeps (2026-09-18).**
+
+Sample: CSM exits whose entry-time settings snapshot has `KRONOS_GATE=live` and a non-null `kronos_pred_fav` (four fail-opens excluded), 09-14 → 09-18. That filter is the definition; re-run it, don't eyeball.
+
+| | N | W/L | net | PF | mean/trade |
+|---|---|---|---|---|---|
+| all scored | 45 | 29/16 | −$1.12 | **0.84** | **−0.041 %** |
+| ran to own exit (SL/TP/trail) | 29 | **29/0** | +$5.66 | ∞ | +0.343 % |
+| `MANUAL_CLOSE` (restart) | 16 (36 %) | 0/16 | −$6.78 | — | — |
+
+**Rule as written (§0.4 #2):** PF 0.84 < 0.9 and mean/trade below the −0.011 % baseline → set `KRONOS_GATE=shadow`. Both criteria fail.
+
+**Decision: KEEP, gate stays live at 0.025.** Operator call, 2026-09-18. The rule was written to judge whether the gate picks trades well; 16 of the 45 were never decided by the market — they were closed by restarts, which the gate had no part in. Every one of the 29 the market did decide was a winner. §0.5.4 set the precedent of flagging a contaminated reading rather than acting on it; this is the same call. The number is recorded unchanged so it cannot be re-litigated later.
+
+**What this reading does NOT show — recorded so it isn't claimed later.** It was proposed that "the system went positive after the gate." It did not, and the gate is not why the account is up:
+
+| 5 d before gate → after | CSM all | CSM organic | NASOS all (ungated) | NASOS organic |
+|---|---|---|---|---|
+| net | +$1.21 → **−$0.99** | +$0.169 → +$0.182 /trade | **−$2.78 → +$1.13** | 90 % → 100 % win |
+
+CSM's all-trade P&L got *worse* under the gate: volume fell ~40 % (as §0.4 predicted) while restart losses stayed the same size in dollars, so they take a larger share. The account's swing to positive came from NASOS, which the gate does not touch — a regime effect, not a gate effect. CSM organic was already 94 % before the gate; the gate took it to 100 %. That is the whole of the gate's contribution and it is exactly what §0.4 forecast: it stops the bleeding, it does not make CSM strongly profitable.
+
+**Honest one-line claim the gate has earned:** it has eliminated CSM's market losses; every CSM loss still on the book is a restart. Restart share was 56 % of CSM exits in the 5 days before the gate and 36 % after — chronic, not new, and the dominant cost in this bot's entire history.
+
+**Pre-registered for the third reading (do not move later):**
+1. Taken at **N ≥ 80** on the same filter.
+2. **Valid only if `MANUAL_CLOSE` share < 20 %.** If it is higher, the reading is *deferred* — not taken on contaminated data and not waved through on organic-only numbers either. Fix the restart discipline first, then read.
+3. On a valid reading the §0.4 #2 thresholds apply as written, no override.
+4. Threshold stays 0.025. The §0.4 #4 volume sweep on 13,626 scored candidates (0.5.18) shows 0.025 passes 23.5 % and still yields 9–17 gated trades/day — not too tight, so no case to lower toward 0.020 yet.
+
 ---
 
 ## 1. CURRENT STATE
