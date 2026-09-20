@@ -840,10 +840,19 @@ async function fetchKronosProgress() {
         if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
         kpFill("k", d.kronos);
         kpFill("w", d.whale);
-        const wn = d.whale.by_strategy?.NASOS_V4, wne = document.getElementById("kp-w-nasos");
-        if (wne && wn) wne.textContent = `NASOS_V4: ${wn.matched} / ${d.whale.target} matched · collected ${wn.collected} · trades with outcome ${wn.trades_with_outcome}`;
-        const n = d.kronos.by_strategy?.NASOS_V4, ne = document.getElementById("kp-k-nasos");
-        if (ne && n) ne.textContent = `NASOS_V4 shadow: ${n.matched} / ${d.kronos.target} matched · scored ${n.scored} · trades with outcome ${n.trades_with_outcome} (not gated)`;
+        // One line per non-gated strategy in the shadow queue (NASOS_V4, TSMOM_4H,
+        // REBALANCING_PREMIUM, ...) - the list comes from the worker's report,
+        // so a strategy added to KRONOS_SHADOW_STRATEGIES shows up here unedited.
+        const wo = document.getElementById("kp-w-others");
+        if (wo) wo.innerHTML = Object.entries(d.whale.by_strategy || {})
+            .filter(([sid]) => sid !== "CSM")
+            .map(([sid, s]) => `<div class="kp-sub">${sid}: ${s.matched} / ${d.whale.target} matched · collected ${s.collected} · trades with outcome ${s.trades_with_outcome}</div>`)
+            .join("");
+        const ko = document.getElementById("kp-k-others");
+        if (ko) ko.innerHTML = Object.entries(d.kronos.by_strategy || {})
+            .filter(([sid]) => sid !== "CSM")
+            .map(([sid, s]) => `<div class="kp-sub">${sid} shadow: ${s.matched} / ${d.kronos.target} matched · scored ${s.scored} · trades with outcome ${s.trades_with_outcome} (not gated)</div>`)
+            .join("");
         const g = document.getElementById("kp-gate");
         if (g && d.gate) {
             const m = d.gate.mode || "unknown";
