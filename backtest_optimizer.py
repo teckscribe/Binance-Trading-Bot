@@ -84,6 +84,8 @@ load_dotenv()
 
 from modules.strategies.cross_sectional_momentum  import CrossSectionalMomentum
 from modules.strategies.freqtrade_port_nasos       import NASOSv4Port
+from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
+from modules.strategies.rebalancing_premium        import RebalancingPremiumStrategy
 
 from modules.risk_engine import (
     MAX_MARGIN_PCT, max_concurrent, daily_loss_cap, weekly_loss_cap,
@@ -153,6 +155,9 @@ LOOKAHEAD_1H    = os.getenv("BT_LOOKAHEAD_1H", "false").lower() == "true"
 STRATEGY_CLASSES = {
     "CSM":   CrossSectionalMomentum,
     "NASOS_V4":   NASOSv4Port,
+    # DCB's two 2026-09-20 additions, ported for a Binance cross-check only.
+    "TSMOM_4H": TSMOM4HStrategy,
+    "REBALANCING_PREMIUM": RebalancingPremiumStrategy,
 }
 
 # Default to whatever the factory actually runs, so a backtest reflects
@@ -175,10 +180,12 @@ STRATEGY_ORDER = PRODUCTION_IDS + [
     if s not in PRODUCTION_IDS
 ]
 TIER = {"CSM": "Elite",
-        "NASOS_V4": "FT"}
+        "NASOS_V4": "FT",
+        "TSMOM_4H": "Quant", "REBALANCING_PREMIUM": "Quant"}
 
 MOCK_REGIME = {"CSM": "BULL_TREND",
-               "NASOS_V4": "BULL_TREND"}
+               "NASOS_V4": "BULL_TREND",
+               "TSMOM_4H": "BULL_TREND", "REBALANCING_PREMIUM": "RANGING"}
 
 # Tokenised equities and leveraged ETFs on Binance USDM Futures. These only
 # move during US cash-session hours and have no perpetual funding dynamics,

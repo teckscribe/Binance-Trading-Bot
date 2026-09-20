@@ -340,6 +340,10 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.23 DCB's TSMOM_4H / REBALANCING_PREMIUM run on Binance as a venue cross-check (2026-09-20).** Both strategy files ported into `modules/strategies/` and registered in `backtest_optimizer.py` **only** — not in the live factory, regime matrix or bots. 22 coins common to both venues, 90 d 1m (`tools/fetch_1m.py`, 603 MB, git-ignored), mock regime. TSMOM_4H N 1,066 PF 1.57 (July 0.78, Aug 1.79, Sep 2.15); REBALANCING_PREMIUM N 806 PF 1.17; CSM on the same 22 majors N 730 PF 1.05 (control — CSM's edge was measured on the top-200 incl. small caps, not these). Per-symbol PF sign agrees with Delta on 20/22. Full write-up in DCB `docs/EXPERIMENT_LOG.md §1.6`. No CSB behaviour change; these are not candidates for CSB — a long-only 3-day-momentum rule on Binance would need its own regime study and CSB already has a BULL-regime strategy (NASOS) at PF 1.60 live.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
