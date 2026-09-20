@@ -352,6 +352,10 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.25 REBALANCING_PREMIUM goes LIVE on CSB, BULL/BEAR only (operator, 2026-09-20).** Recommendation was to retire it (DCB §1.6.6: Delta PF 1.08, Binance 1.17, negative ex top-10, negative in RANGING). Operator chose to run it in BULL_TREND and BEAR_TREND. Wired like TSMOM_4H: factory, permissions (RANGING/OVERSOLD false), leverage 3, default cap `REBALANCING_PREMIUM:1`, shadow lists, labels 🟣. Fix on the way: `manage()` never checked `tp_price` — 34 % of its backtest exits were TP hits (harness tests TP intrabar), so live would have run a different strategy than the one measured; TP check added in both repos. What it does live: at 23:00–00:59 UTC, longs each of BTC/ETH/SOL/DOGE/XRP/SUI/NEAR/AVAX/LINK/ADA (cap permitting), SL = TP = 3×ATR(1h), 24 h hold. Same pre-registered reading as §0.5.24: by calendar month; ≥ 40 closed trades, PF ≥ 1.2 keep / < 0.8 off.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

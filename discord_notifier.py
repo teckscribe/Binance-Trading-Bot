@@ -37,6 +37,7 @@ _STRATEGY_META = {
     "CSM":        {"emoji": "🟢", "label": "Cross-Sectional Momentum"},
     "NASOS_V4":   {"emoji": "🟡", "label": "NASOS V4 Dip-Buy"},
     "TSMOM_4H":   {"emoji": "🔵", "label": "TSMOM 4H Trend"},
+    "REBALANCING_PREMIUM": {"emoji": "🟣", "label": "Rebalancing Premium"},
 }
 
 _REGIME_EMOJI = {

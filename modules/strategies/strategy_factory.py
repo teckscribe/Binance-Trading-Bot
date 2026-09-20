@@ -28,11 +28,13 @@ from modules.strategies.base_strategy               import BaseStrategy
 from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
 from modules.strategies.freqtrade_port_nasos        import NASOSv4Port
 from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
+from modules.strategies.rebalancing_premium        import RebalancingPremiumStrategy
 
 _ALL_STRATEGIES = [
     CrossSectionalMomentum(),
     NASOSv4Port(),
     TSMOM4HStrategy(),
+    RebalancingPremiumStrategy(),
 ]
 
 _STRATEGY_MAP = {s.STRATEGY_ID: s for s in _ALL_STRATEGIES}

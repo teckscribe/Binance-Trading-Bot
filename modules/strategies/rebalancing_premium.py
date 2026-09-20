@@ -127,8 +127,13 @@ class RebalancingPremiumStrategy(BaseStrategy):
         except Exception:
             pass
 
-        # Stop loss safety floor
+        # Stop loss floor and take profit. The harness tests both intrabar
+        # (34 % of backtest exits were TP hits); live must check TP too or the
+        # measured strategy and the running one are different strategies.
         sl_price = float(position.get("sl_price", 0.0))
+        tp_price = float(position.get("tp_price", 0.0))
+        if tp_price > 0 and current_price >= tp_price:
+            return {"exit": True, "exit_price": current_price, "exit_reason": "TP_HIT"}
         if sl_price > 0 and current_price <= sl_price:
             return {"exit": True, "exit_price": current_price, "exit_reason": "SL_HIT"}
 

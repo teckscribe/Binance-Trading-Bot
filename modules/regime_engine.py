@@ -485,15 +485,17 @@ REGIME_STRATEGY_PERMISSIONS = {
     # TSMOM_4H: DCB 1.6 measured positive in all three (BEAR +1.06%, BULL +0.98%,
     # RANGING +0.37% per trade) but the edge is calendar-driven (July < 1 on both
     # venues) - read it by month, not by regime.
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True},
-    "BEAR_TREND":  {"CSM": True,  "NASOS_V4": True,  "TSMOM_4H": True},
-    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": True},
+    # REBALANCING_PREMIUM: operator choice 2026-09-20 (log 0.5.25); DCB 1.6 has it
+    # at PF 1.08/1.17 and negative in RANGING - BULL/BEAR only, 1 slot.
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True, "REBALANCING_PREMIUM": True},
+    "BEAR_TREND":  {"CSM": True,  "NASOS_V4": True,  "TSMOM_4H": True, "REBALANCING_PREMIUM": True},
+    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": True, "REBALANCING_PREMIUM": False},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
     # enough in the 90d window that it carries no measurement at all. Leaving it
     # True would let CSM trade an unmeasured regime under a config tuned for a
     # different one. Re-enable only with numbers behind it.
-    "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False},
+    "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False},
     "OVERHEATED":  {},
 }
 
