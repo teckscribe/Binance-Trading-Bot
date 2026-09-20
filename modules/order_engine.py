@@ -691,6 +691,53 @@ def _get_manual_close_price(symbol: str, direction: str) -> float | None:
     return None
 
 
+def _algo_stop_fired(symbol: str, algo_id) -> bool | None:
+    """
+    True if the bot's conditional stop (placed on /fapi/v1/algoOrder) has
+    triggered, False if it is still resting / was cancelled, None if the
+    query failed.
+
+    Why this exists: a CONDITIONAL algo order that triggers spawns a plain
+    MARKET order with its own orderId. In /fapi/v1/allOrders that fill has
+    type=MARKET and does not carry the algoId, so the old classifier saw
+    "a market close not placed by us" and booked SL_HIT as MANUAL_CLOSE —
+    44 of 181 CSM manual closes to 2026-09-20 exited within 0.2 % of the
+    stop price.
+    """
+    if algo_id is None:
+        return None
+    try:
+        resp = SESSION.get(
+            BASE_URL + "/fapi/v1/algoOrder",
+            params=sign_params({"symbol": symbol, "algoId": algo_id}),
+            headers=api_headers(), timeout=8,
+        )
+        if resp.status_code != 200:
+            return None
+        d = resp.json()
+        status = str(d.get("algoStatus") or d.get("status") or "").upper()
+        if status in ("TRIGGERED", "FINISHED", "FILLED"):
+            return True
+        if int(d.get("triggerTime") or 0) > 0:
+            return True
+        if status in ("NEW", "CANCELED", "CANCELLED", "EXPIRED", "REJECTED", "WORKING"):
+            return False
+        log.info(f"[Reconcile] algoOrder {symbol} {algo_id}: unrecognised status {d}")
+        return None
+    except Exception as exc:
+        log.warning(f"algoOrder query failed [{symbol}]: {exc}")
+        return None
+
+
+def _near_stop(pos: dict, price: float | None, tol: float = 0.003) -> bool:
+    """Fill within tol of the tracked stop price - the shape of a stop fill."""
+    try:
+        sl = float(pos.get("sl_price") or 0.0)
+        return bool(sl) and price is not None and abs(price - sl) / sl <= tol
+    except (TypeError, ValueError, ZeroDivisionError):
+        return False
+
+
 def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None, bool]:
     """
     Work out WHY a tracked position is no longer on Binance, from the order
@@ -737,6 +784,10 @@ def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None, bool]:
     if not fills:
         # allOrders may itself have failed; userTrades is the second witness.
         price = _get_manual_close_price(symbol, direction)
+        if price is not None:
+            fired = _algo_stop_fired(symbol, pos.get("stop_order_id"))
+            if fired is True or (fired is None and _near_stop(pos, price)):
+                return "SL_HIT", "exchange" if fired else "exchange:inferred", price, True
         return "MANUAL_CLOSE", "manual", price, price is not None
 
     o = max(fills, key=lambda x: int(x.get("updateTime", 0) or 0))
@@ -754,6 +805,18 @@ def _classify_exchange_close(pos: dict) -> tuple[str, str, float | None, bool]:
         return "LIQUIDATED", "exchange", price, True
     if otype in ("TAKE_PROFIT_MARKET", "TAKE_PROFIT"):
         return "TP_HIT", "exchange", price, True
+
+    # A triggered algo stop fills as a plain MARKET order (see _algo_stop_fired).
+    # Ask the algo order itself; if that is unavailable, a market fill sitting
+    # on the stop price is a stop, not a human.
+    if otype == "MARKET":
+        fired = _algo_stop_fired(symbol, pos.get("stop_order_id"))
+        if fired is True:
+            return "SL_HIT", "exchange", price, True
+        if fired is None and _near_stop(pos, price):
+            log.info(f"[Reconcile] {symbol}: market fill {price} on stop "
+                     f"{pos.get('sl_price')} - classing as SL_HIT (algo query unavailable)")
+            return "SL_HIT", "exchange:inferred", price, True
     return "MANUAL_CLOSE", "manual", price, True
 
 

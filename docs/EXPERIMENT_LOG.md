@@ -316,6 +316,30 @@ CSM's all-trade P&L got *worse* under the gate: volume fell ~40 % (as §0.4 pred
 
 ---
 
+**0.5.22 Stop fills were booked as MANUAL_CLOSE — root cause, fix, and what it does to §0.5.21 (2026-09-20).**
+
+**Finding.** Only 7 `SL_HIT` exits exist in the whole live ledger against 248 `MANUAL_CLOSE`. Of the 23 `MANUAL_CLOSE` exits in the scored Kronos sample (N=59, 09-14 → 09-20), **20 exited within 0.3 % of the tracked stop price** — 14 of them within 0.05 %. Those are stop-loss fills, not humans and not restarts (no `SHUTDOWN` exit has ever been logged either).
+
+**Cause.** The bot's stops are `CONDITIONAL` algo orders on `/fapi/v1/algoOrder`. When one triggers, Binance places a plain `MARKET` order with its own `orderId`; in `/fapi/v1/allOrders` that fill has `type=MARKET` and no `algoId`, so `_classify_exchange_close` saw "a market close we didn't place" and returned `MANUAL_CLOSE`. The §0.5.1 phantom-close fix (exit == entry) was a different bug; this one has been present since stops moved to the algo endpoint.
+
+**Fix** (`modules/order_engine.py`): on a `MARKET` closing fill the classifier now asks Binance for the algo order itself (`GET /fapi/v1/algoOrder?algoId=`) and books `SL_HIT` when it reports triggered; if that query fails, a market fill within 0.3 % of `sl_price` is booked `SL_HIT` with `exit_source=exchange:inferred`. Same inference on the userTrades fallback path. Historical records are **not** rewritten; the near-stop test above is how to re-read them.
+
+**Consequence for §0.5.21.** That reading rested on "16 of 45 were closed by restarts, which the gate had no part in; every trade the market decided was a winner." The 16 were stop hits — the market decided them. Re-read on today's N=59 scored sample with the near-stop relabel:
+
+| | N | wins | PF |
+|---|---|---|---|
+| scored, as booked (`MANUAL_CLOSE` excluded as "restart") | 36 | 35 (97 %) | — |
+| scored, stop hits counted as market outcomes | **56** | 36 (64 %) | **0.64** |
+| scored, all 59 | 59 | 36 | 0.64 (−6.88 % equity) |
+
+The gate's "organic 100 % win" was an artefact of excluding its losses. CSM under the live gate is PF 0.64 over 59 scored trades; all CSM since 09-14 is N 71, PF 0.68, −6.65 % of equity. The §0.4 #2 rule (PF < 0.9 → `KRONOS_GATE=shadow`) is failed on clean data, not contaminated data. Under §0.5.21's own pre-registration the third reading is taken at N ≥ 80 with no override; at the current ~7 scored trades/day that is ~3 days away. `MANUAL_CLOSE` share after relabel is 3/59 = 5 %, so the reading will be valid. **Nothing changed today; the operator was told the KEEP decision was made on a mislabel.**
+
+**Kronos and whale — targets reached, verdicts (N=148 matched CSM).** Kronos: `pred_fav` alone AUC 0.60; 27 ML features 0.653; with Kronos 0.652 (ΔAUC −0.002) → redundant with the ML features (§0.5.19's reading, now at 148, confirms). Whale: every positioning bucket PF < 1; rank-by-`dir_top` top half PF 0.59 vs bottom 0.38 vs all 0.50 → no usable signal. NASOS deferred on both (38 matched of 80/120). The underlying CSM record both are measured on is PF 0.50 over those 148 trades.
+
+**Operator observation — "one or two good days, then one or two bad days".** Tested on 26 exit-days (IST): sign sequence `+++----+++-+-++---++-+++--`; runs test 12 observed vs 13.9 ± 2.5 expected for independent days; lag-1 autocorrelation of daily P&L −0.05. **At the day scale it is indistinguishable from coin flips** — yesterday's sign does not predict today's. At the hour scale there is something: consecutive closes < 1 h apart share sign 65 % (56 % expected from the 68 % win rate); 1–4 h apart 56 %; > 4 h nothing. Overlapping positions share sign only 48 %, so it is not concurrency. A global streak breaker (2 consecutive losses → no entries for 2 h) replayed on the 109 post-09-14 trades skips 11 (−3.50 %) and lifts PF 0.89 → 1.01. N=11, in-sample — a hypothesis. Not implemented; if adopted it goes in as a setting defaulting off, pre-registered, judged after 30 skipped entries.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
