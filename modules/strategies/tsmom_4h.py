@@ -21,6 +21,22 @@ from modules import settings_manager as cfg
 from modules.strategies.base_strategy import BaseStrategy
 
 
+def _time_indexed(df):
+    """
+    The live data feed returns a RangeIndex with a `timestamp` column; the
+    backtest harness returns a DatetimeIndex. resample() and .hour need the
+    latter. Without this the strategy silently never fired live (resample
+    raised -> None) while the harness measured it fine.
+    """
+    if df is None or len(df) == 0:
+        return df
+    if "timestamp" in df.columns:
+        return df.set_index(pd.to_datetime(df["timestamp"], utc=True))
+    if not isinstance(df.index, pd.DatetimeIndex):
+        return None
+    return df
+
+
 class TSMOM4HStrategy(BaseStrategy):
     STRATEGY_ID = "TSMOM_4H"
     REQUIRES_1H = True
@@ -30,10 +46,13 @@ class TSMOM4HStrategy(BaseStrategy):
     HOLD_MINUTES = 1440    # 24 hours
     SL_ATR_MULT = 2.0
     TP_ATR_MULT = 4.0
-    MIN_MOM_PCT = 0.015    # At least +1.5% momentum over 72h to enter
+    MIN_MOM_PCT = 0.05     # default; DCB 1.6.5: 1.5% admits ~850 fee-paying noise trades
 
     def scan(self, symbol: str, df_1m: pd.DataFrame, df_15m: pd.DataFrame, df_1h: pd.DataFrame, regime: dict) -> dict:
         if df_1h is None or len(df_1h) < (self.LOOKBACK_4H_BARS * 4 + 20):
+            return None
+        df_1h = _time_indexed(df_1h)
+        if df_1h is None:
             return None
 
         # Resample 1h to 4h bars
@@ -73,7 +92,11 @@ class TSMOM4HStrategy(BaseStrategy):
         vol_norm = atr_4h / current_price  # Normalized ATR volatility
 
         # Directional Filter: Positive momentum exceeding minimum threshold
-        if mom_pct < self.MIN_MOM_PCT:
+        try:
+            min_mom = float(cfg.get("TSMOM_MIN_MOM_PCT"))
+        except Exception:
+            min_mom = self.MIN_MOM_PCT
+        if mom_pct < min_mom:
             return None
 
         # Inverse Volatility Weighting / Conviction Strength

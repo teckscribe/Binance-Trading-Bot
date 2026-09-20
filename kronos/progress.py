@@ -73,7 +73,7 @@ def _backlog(offset_file, queue_file):
     return n
 
 
-SHADOW_STRATEGIES = ("CSM", "NASOS_V4")
+SHADOW_STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H")
 
 
 def _trades(strategy):

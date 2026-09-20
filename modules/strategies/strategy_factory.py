@@ -27,10 +27,12 @@ DELETED 2026-09-14: TP (trend_pullback), FF_V2 (funding_fade_v2), GRID,
 from modules.strategies.base_strategy               import BaseStrategy
 from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
 from modules.strategies.freqtrade_port_nasos        import NASOSv4Port
+from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
 
 _ALL_STRATEGIES = [
     CrossSectionalMomentum(),
     NASOSv4Port(),
+    TSMOM4HStrategy(),
 ]
 
 _STRATEGY_MAP = {s.STRATEGY_ID: s for s in _ALL_STRATEGIES}

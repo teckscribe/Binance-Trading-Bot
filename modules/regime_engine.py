@@ -482,15 +482,18 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True},
-    "BEAR_TREND":  {"CSM": True, "NASOS_V4": True},
-    "RANGING":     {"CSM": True, "NASOS_V4": False},
+    # TSMOM_4H: DCB 1.6 measured positive in all three (BEAR +1.06%, BULL +0.98%,
+    # RANGING +0.37% per trade) but the edge is calendar-driven (July < 1 on both
+    # venues) - read it by month, not by regime.
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True},
+    "BEAR_TREND":  {"CSM": True,  "NASOS_V4": True,  "TSMOM_4H": True},
+    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": True},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
     # enough in the 90d window that it carries no measurement at all. Leaving it
     # True would let CSM trade an unmeasured regime under a config tuned for a
     # different one. Re-enable only with numbers behind it.
-    "OVERSOLD":    {"CSM": False, "NASOS_V4": False},
+    "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False},
     "OVERHEATED":  {},
 }
 

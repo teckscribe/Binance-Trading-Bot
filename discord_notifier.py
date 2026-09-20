@@ -36,6 +36,7 @@ _COLOR_GREY   = 0x95A5A6
 _STRATEGY_META = {
     "CSM":        {"emoji": "🟢", "label": "Cross-Sectional Momentum"},
     "NASOS_V4":   {"emoji": "🟡", "label": "NASOS V4 Dip-Buy"},
+    "TSMOM_4H":   {"emoji": "🔵", "label": "TSMOM 4H Trend"},
 }
 
 _REGIME_EMOJI = {

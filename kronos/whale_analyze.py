@@ -34,7 +34,7 @@ def T(s):
     except Exception: return None
 
 
-STRATEGIES = ("CSM", "NASOS_V4")
+STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H")
 
 
 def main():

@@ -344,6 +344,14 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.24 TSMOM_4H goes LIVE on CSB (operator, 2026-09-20).** Operator decision after §0.5.23 / DCB §1.6: run DCB's TSMOM_4H on Binance with real money. Concern stated and recorded: backtest-only evidence, two losing months of four (July PF 0.78 on Binance), long-only, calendar-driven. Wired: factory, `REGIME_STRATEGY_PERMISSIONS` (BULL/BEAR/RANGING true, OVERSOLD false — matches DCB), `STRATEGY_LEVERAGE` 3, default `MAX_PER_STRATEGY` gains `TSMOM_4H:1` (**one slot**), new hot setting `TSMOM_MIN_MOM_PCT` default **0.05** (DCB §1.6.5: 1.5 % → PF 1.57, 5 % → 1.76 on Binance), Kronos/whale shadow lists (scored, not gated), bot/notifier/analyzer labels. The box's `settings.json` is untracked — the operator adds `TSMOM_4H:1` to `MAX_PER_STRATEGY` from Telegram.
+
+**Live-path bug found and fixed on the way (both repos).** The live data feed returns a RangeIndex + `timestamp` column; the harness returns a DatetimeIndex. `df_1h.resample("4h")` therefore raised in live and the strategy returned None on every scan — it could never have fired on DCB either. REBALANCING_PREMIUM was worse: `index[-1].hour` on an int defaulted to 0 and *passed* its midnight check on every scan. Both now build the time index from the column. Dry scan on live Binance candles after the fix: 9 of 10 majors signalled (72 h momentum +5.8 % … +30 %), i.e. the market is currently in exactly the state the backtest made its money in.
+
+**Pre-registered reading (do not move later):** judge by calendar month, not regime. Live PF over the first ≥ 40 closed TSMOM trades ≥ 1.2 → keep; < 0.8 → off. A flat-BTC month at PF 0.8–0.9 is the expected failure mode and is *not* a reason to tune the threshold mid-month.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

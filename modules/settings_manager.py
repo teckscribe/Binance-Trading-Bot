@@ -102,8 +102,8 @@ SPEC = [
     # ── Risk & sizing ────────────────────────────────────────────────────────
     _s("MAX_CONCURRENT", "Risk", "int", 3, "Max concurrent positions",
        "Total open positions across all strategies.", min=1, max=20),
-    _s("MAX_PER_STRATEGY", "Risk", "csv_caps", "CSM:3,NASOS_V4:3",
-       "Per-strategy caps", "Format: CSM:2,NASOS_V4:2"),
+    _s("MAX_PER_STRATEGY", "Risk", "csv_caps", "CSM:3,NASOS_V4:3,TSMOM_4H:1",
+       "Per-strategy caps", "Format: CSM:2,NASOS_V4:2,TSMOM_4H:1"),
     _s("MAX_TOTAL_MARGIN_PCT", "Risk", "float", 0.60, "Max total margin (fraction)",
        "Ceiling on combined margin as a fraction of equity.",
        min=0.05, max=1.0, step="0.01"),
@@ -142,6 +142,9 @@ SPEC = [
     # ── CSM ──────────────────────────────────────────────────────────────────
     _s("CSM_ALLOW_LONG", "CSM", "bool", True, "Allow LONG"),
     _s("CSM_ALLOW_SHORT", "CSM", "bool", True, "Allow SHORT"),
+    _s("TSMOM_MIN_MOM_PCT", "TSMOM", "float", 0.05, "TSMOM min 72h momentum",
+       "Fraction. 0.05 = enter only if the coin rose >= 5% over the last 72h "
+       "(18 closed 4h bars). DCB 1.6.5: 1.5% -> PF 1.33, 5% -> PF 1.50, 7% -> 1.54."),
     _s("CSM_MOM_LO", "CSM", "float", 3.0, "Momentum band low (x ATR)",
        "Entry when |24h move| / ATR(1h) is in [low, high).", min=0.5, max=20, step="0.1"),
     _s("CSM_MOM_HI", "CSM", "float", 4.0, "Momentum band high (x ATR)",

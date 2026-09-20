@@ -1288,7 +1288,7 @@ def _scan_for_signals(
 # has its own verdict — the 0.025 threshold was measured on CSM and does not
 # transfer. Module constants — changing them needs a restart; deliberately
 # not a hot setting so the gated set cannot be widened from a bot command.
-KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4")
+KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H")
 KRONOS_GATE_STRATEGIES   = ("CSM",)
 
 

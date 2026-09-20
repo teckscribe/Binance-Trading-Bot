@@ -31,6 +31,7 @@ BASE_URL  = f"https://api.telegram.org/bot{BOT_TOKEN}"
 _STRATEGY_META = {
     "CSM":        {"emoji": "\U0001f7e2", "label": "Cross-Sectional Momentum"},
     "NASOS_V4":   {"emoji": "\U0001f7e1", "label": "NASOS V4 Dip-Buy"},
+    "TSMOM_4H":   {"emoji": "\U0001f535", "label": "TSMOM 4H Trend"},
 }
 
 _REGIME_EMOJI = {

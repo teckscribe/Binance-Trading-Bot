@@ -23,6 +23,22 @@ import numpy as np
 from modules.strategies.base_strategy import BaseStrategy
 
 
+def _time_indexed(df):
+    """
+    The live data feed returns a RangeIndex with a `timestamp` column; the
+    backtest harness returns a DatetimeIndex. resample() and .hour need the
+    latter. Without this the strategy silently never fired live (resample
+    raised -> None) while the harness measured it fine.
+    """
+    if df is None or len(df) == 0:
+        return df
+    if "timestamp" in df.columns:
+        return df.set_index(pd.to_datetime(df["timestamp"], utc=True))
+    if not isinstance(df.index, pd.DatetimeIndex):
+        return None
+    return df
+
+
 class RebalancingPremiumStrategy(BaseStrategy):
     STRATEGY_ID = "REBALANCING_PREMIUM"
     REQUIRES_1H = True
@@ -41,6 +57,9 @@ class RebalancingPremiumStrategy(BaseStrategy):
             return None
 
         if df_1h is None or len(df_1h) < 25:
+            return None
+        df_1h = _time_indexed(df_1h)
+        if df_1h is None:
             return None
 
         # Check if we are near the daily rebalance window (00:00 UTC +/- 30 min)
