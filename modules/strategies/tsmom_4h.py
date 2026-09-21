@@ -41,6 +41,7 @@ class TSMOM4HStrategy(BaseStrategy):
     STRATEGY_ID = "TSMOM_4H"
     REQUIRES_1H = True
     REQUIRES_1M_DEPTH = 300
+    REQUIRES_1H_DEPTH = 150   # 18 x 4h lookback + ATR(14) on 4h, with margin; live feed defaulted to 50
 
     LOOKBACK_4H_BARS = 18  # 72 hours
     HOLD_MINUTES = 1440    # 24 hours

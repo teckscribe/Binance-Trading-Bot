@@ -356,6 +356,10 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.26 TSMOM_4H silent for 18 h — 1h feed depth (2026-09-21).** Kronos/whale progress showed `TSMOM_4H scored 0` since go-live while REBALANCING_PREMIUM queued 448 and took its first trade (DOGE, TP_HIT +0.97 %). Cause: `data_hub._get_1h()` fetched a fixed **50** hourly bars; TSMOM needs 92 (18 × 4 h + ATR warm-up) and returned None on every scan. Yesterday's dry run used 200 bars, which is why it fired there. Fix: strategies declare `REQUIRES_1H_DEPTH` (TSMOM 150), the scanner takes the max over permitted strategies and `data_hub` fetches/caches to that depth — the same mechanism `REQUIRES_1M_DEPTH` already used. Verified through the real `fetch_all_symbols → scan()` path: BTC signals. Rate cost: klines w1 → w2 per symbol on 10-min cache misses. Same fix in DCB (§1.6.8). Also observed: SAGA exit today booked `SL_HIT` — the §0.5.22 classifier fix is working.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

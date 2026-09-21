@@ -58,18 +58,27 @@ _1h_lock     = threading.Lock()
 _1h_stats    = {"hit": 0, "miss": 0}
 
 
-def _get_1h(symbol):
-    """Return cached 1h candles for `symbol`, fetching only when stale."""
+def _get_1h(symbol, depth_1h: int = 50):
+    """
+    Return cached 1h candles for `symbol`, fetching only when stale or when
+    the cached frame is shorter than `depth_1h`.
+
+    depth_1h follows the permitted strategies' REQUIRES_1H_DEPTH (see
+    fetch_all_symbols). It was a fixed 50 until 2026-09-21: CSM needs ~24 bars
+    so nobody noticed, but TSMOM_4H needs 92 (18 x 4h + ATR warm-up) and
+    returned "no signal" on every live scan for 18 h while the harness --
+    handed the full series -- measured it fine. EXPERIMENT_LOG 0.5.26.
+    """
     now = time.monotonic()
 
     with _1h_lock:
         entry = _1h_cache.get(symbol)
-        if entry is not None and (now - entry[0]) < _ONE_H_TTL:
+        if entry is not None and (now - entry[0]) < _ONE_H_TTL and len(entry[1]) >= min(depth_1h, 1000) - 5:
             _1h_stats["hit"] += 1
             # Copy so a caller can never mutate what the next cycle will reuse.
             return entry[1].copy()
 
-    df = _rate_gated_fetch(symbol, "1h", limit=50)
+    df = _rate_gated_fetch(symbol, "1h", limit=depth_1h)
 
     with _1h_lock:
         _1h_stats["miss"] += 1
@@ -117,7 +126,7 @@ _btc_ref_cache = {"ts": 0.0, "data": None}
 _btc_ref_lock  = threading.Lock()
 
 
-def _fetch_symbol(symbol, need_1h: bool = False, depth_1m: int = 200):
+def _fetch_symbol(symbol, need_1h: bool = False, depth_1m: int = 200, depth_1h: int = 50):
     """
     Fetch 1m + 15m always. 1h only when a permitted strategy declares
     REQUIRES_1H — and then via the TTL cache rather than every cycle.
@@ -130,12 +139,13 @@ def _fetch_symbol(symbol, need_1h: bool = False, depth_1m: int = 200):
     """
     df_1m  = _rate_gated_fetch(symbol, "1m",  limit=depth_1m)
     df_15m = _rate_gated_fetch(symbol, "15m", limit=200)   # always fresh — see note above
-    df_1h  = _get_1h(symbol) if need_1h else pd.DataFrame()
+    df_1h  = _get_1h(symbol, depth_1h) if need_1h else pd.DataFrame()
     return symbol, df_1m, df_15m, df_1h
 
 
 def fetch_all_symbols(symbols, max_workers=MAX_CONCURRENT, regime: str = "",
-                      need_1h: bool | None = None, depth_1m: int = 200):
+                      need_1h: bool | None = None, depth_1m: int = 200,
+                      depth_1h: int = 50):
     """
     Fetch 1m + 15m (+ optionally 1h) candles for all symbols in parallel.
 
@@ -172,7 +182,7 @@ def fetch_all_symbols(symbols, max_workers=MAX_CONCURRENT, regime: str = "",
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_fetch_symbol, sym, need_1h, depth_1m): sym
+            executor.submit(_fetch_symbol, sym, need_1h, depth_1m, depth_1h): sym
             for sym in symbols
         }
         for future in as_completed(futures):

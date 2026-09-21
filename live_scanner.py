@@ -1920,9 +1920,13 @@ def main() -> None:
                     (getattr(s, "REQUIRES_1M_DEPTH", 200) for s in _data_srcs),
                     default=200,
                 )
+                _depth_1h = max(
+                    (getattr(s, "REQUIRES_1H_DEPTH", 50) for s in _data_srcs),
+                    default=50,
+                )
                 symbol_data = fetch_all_symbols(
                     scan_syms, regime=current_regime, need_1h=_need_1h,
-                    depth_1m=_depth_1m,
+                    depth_1m=_depth_1m, depth_1h=_depth_1h,
                 )
 
             # ── 3b. Process square-off queue from web dashboard ────────────────
