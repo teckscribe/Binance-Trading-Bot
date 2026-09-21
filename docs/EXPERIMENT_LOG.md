@@ -360,6 +360,10 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.27 Operator parks CSM and NASOS; CSB runs the two new strategies only (2026-09-21 ~17:00 IST).** `MAX_PER_STRATEGY = CSM:0, NASOS_V4:0, TSMOM_4H:1, REBALANCING_PREMIUM:2`, `MAX_CONCURRENT=4`, equity fallback $57. Intentional, confirmed. Consequences recorded so later readings are interpreted correctly: (1) the §0.5.21 third Kronos reading (N ≥ 80 scored CSM) is **suspended** at N=59, PF 0.64 — it resumes only if CSM is re-enabled, and the clock does not restart; (2) NASOS's Kronos/whale shadow targets (44/80, 44/120) stop accruing; (3) from this point CSB's live P&L is TSMOM_4H + REBALANCING_PREMIUM, both backtest-only entrants (§0.5.24/25) judged by calendar month — REBALANCING now has two slots, so its N accrues ~2× faster than TSMOM's. Kronos and whale keep scoring both in shadow.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
