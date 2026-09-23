@@ -112,6 +112,21 @@ class CrossSectionalMomentum(BaseStrategy):
 
         c1h = df_1h['close'].astype(float)
 
+        # CSM_CLOSED_BAR_MOM: measure momentum on CLOSED hourly bars only.
+        #
+        # Default (false) keeps the shipped behaviour: the reading includes the
+        # FORMING hourly bar, which live moves every minute. Measured over
+        # 14,640 intra-hour readings (0.5.28): median drift 0.208 ATR against a
+        # 1.0-ATR-wide entry band, and 28 % of mid-hour signals are gone by the
+        # hour's close. The harness only ever sees closed bars, so live trades a
+        # population the backtest never evaluated.
+        #
+        # true drops the forming bar, so live and backtest measure the same
+        # thing. Cost: entries lag by up to 59 min.
+        if cfg.get("CSM_CLOSED_BAR_MOM") and len(df_1h) >= 26:
+            c1h = c1h.iloc[:-1]
+            df_1h = df_1h.iloc[:-1]
+
         # Calculate 24h price change
         price_change = c1h.iloc[-1] - c1h.iloc[-25]
 

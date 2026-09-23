@@ -149,6 +149,9 @@ def _bt_regime_ok(strategy_id, regime):
 # Keep it False. The flag exists only so historical numbers can be reproduced
 # and the delta re-measured; it is not a tuning knob.
 LOOKAHEAD_1H    = os.getenv("BT_LOOKAHEAD_1H", "false").lower() == "true"
+# Hand strategies the FORMING hourly bar, as the live feed does (see the block
+# in run_backtest_1m). Off by default; 0.5.28.
+FORMING_1H      = os.getenv("BT_FORMING_1H", "false").lower() == "true"
 
 # OIB and WKD deleted 2026-08-11 — their source files are gone, so they can no
 # longer be backtested even with --strategies. See strategy_factory.py.
@@ -328,6 +331,22 @@ def build_regime_series(days=30, verbose=True):
     funding  = load_funding("BTCUSDT", start_ms, end_ms)
     if funding.empty and verbose:
         print("  ! no funding history — OVERHEATED/OVERSOLD cannot trigger")
+
+    # load_funding() returns a tz-AWARE UTC index (its own comment explains why);
+    # load_data() returns a tz-NAIVE one despite its docstring. Comparing them
+    # below raised "Cannot compare tz-naive and tz-aware datetime-like objects"
+    # and took regime classification down with it -- which is invisible, because
+    # main() catches it and silently falls back to the legacy mock regime, so
+    # every CSM run scored a strategy that lives in RANGING/BEAR as though the
+    # market were permanently BULL_TREND. Align the funding index to whatever
+    # the bar index uses; do not touch load_data, whose naive index the rest of
+    # the harness (regime_at, the 1m loop) is built around.
+    if not funding.empty:
+        _bars_aware = btc.index.tz is not None
+        if _bars_aware and funding.index.tz is None:
+            funding.index = funding.index.tz_localize("UTC")
+        elif not _bars_aware and funding.index.tz is not None:
+            funding.index = funding.index.tz_localize(None)
 
     series, current, set_at = {}, "", None
     for i in range(MIN_BARS_NEEDED, len(btc)):
@@ -691,6 +710,34 @@ def run_backtest_1m(strategy_class, symbol, regime_series=None,
         else:
             cur_1h  = df_1h[df_1h.index + _ONE_HOUR <= now] if needs_1h else None
             cur_15m = df_15m[df_15m.index + _QUARTER <= now] if needs_15m else None
+
+        # BT_FORMING_1H: reproduce what LIVE actually hands a strategy.
+        #
+        # Strict as-of (above) admits an hourly bar only once it has CLOSED.
+        # The live data feed does not: data_hub returns the bar in progress, so
+        # a strategy reading df_1h.iloc[-1] -- CSM does, for both the 24h change
+        # and ATR(14) -- sees a bar that moves every minute. Measured over
+        # 14,640 intra-hour readings (EXPERIMENT_LOG 0.5.28), CSM's momentum
+        # drifts a median 0.208 ATR inside the hour against a 1.0-ATR-wide entry
+        # band, and 28 % of mid-hour signals are gone by the hour's close. The
+        # strict harness therefore scores a population live never trades, and
+        # live trades one the harness never scored.
+        #
+        # With this on, the partial bar is built from the 1m bars of the current
+        # hour (open=first, high=max, low=min, close=last, volume=sum) and
+        # appended -- exactly the shape data_hub delivers. Off by default: it
+        # changes every historical CSM figure.
+        if FORMING_1H and needs_1h and cur_1h is not None and len(cur_1h):
+            _hr  = now.floor("h")
+            _seg = cur_1m[cur_1m.index >= _hr]
+            if len(_seg):
+                cur_1h = pd.concat([cur_1h, pd.DataFrame({
+                    "open":   [float(_seg["open"].iloc[0])],
+                    "high":   [float(_seg["high"].max())],
+                    "low":    [float(_seg["low"].min())],
+                    "close":  [float(_seg["close"].iloc[-1])],
+                    "volume": [float(_seg["volume"].sum())],
+                }, index=[_hr])])
 
         if mock_regime_name:
             regime = {"regime": mock_regime_name, "funding": 0.0}

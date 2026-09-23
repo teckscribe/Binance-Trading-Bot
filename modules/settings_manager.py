@@ -145,6 +145,10 @@ SPEC = [
     _s("TSMOM_MIN_MOM_PCT", "TSMOM", "float", 0.05, "TSMOM min 72h momentum",
        "Fraction. 0.05 = enter only if the coin rose >= 5% over the last 72h "
        "(18 closed 4h bars). DCB 1.6.5: 1.5% -> PF 1.33, 5% -> PF 1.50, 7% -> 1.54."),
+    _s("CSM_CLOSED_BAR_MOM", "CSM", "bool", False, "Momentum on closed 1h bars",
+       "OFF = shipped behaviour (reading includes the forming hourly bar; 28 % of "
+       "mid-hour signals repaint away, log 0.5.28). ON = closed bars only, so live "
+       "matches the backtest; entries lag up to 59 min."),
     _s("CSM_MOM_LO", "CSM", "float", 3.0, "Momentum band low (x ATR)",
        "Entry when |24h move| / ATR(1h) is in [low, high).", min=0.5, max=20, step="0.1"),
     _s("CSM_MOM_HI", "CSM", "float", 4.0, "Momentum band high (x ATR)",

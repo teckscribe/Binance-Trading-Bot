@@ -406,6 +406,40 @@ Pre-registered before either ships: run both against the existing harness (once 
 
 ---
 
+**0.5.29 CSM does not "fail live" — the backtest was never measured in the regimes CSM trades (2026-09-24).** Follow-up to 0.5.28. Two harness defects, then the answer.
+
+**Defect 1 — regime classification has been silently dead.** `load_funding()` returns a tz-AWARE UTC index (fixed earlier, with a comment); `load_data()` returns a tz-NAIVE one despite its docstring promising UTC. `build_regime_series()` compares them, throws `Cannot compare tz-naive and tz-aware`, `main()` catches it and prints one line — *"falling back to legacy mock regime"* — then carries on. So whenever BTC funding history existed, every CSM run scored a RANGING/BEAR strategy as though the market were permanently BULL_TREND. Fixed by aligning the funding index to the bar index inside `build_regime_series` (not by changing `load_data`, which `regime_at` and the 1m loop are built around). 2,135 hourly bars now classify: RANGING 60.6 %, BULL 23.2 %, BEAR 16.2 %. **Also missing:** `data/{BTC,ETH,SOL}USDT_1h_90d.csv` did not exist (only 40d), so even without the crash the series could not be built; fetched.
+
+**Defect 2 — the harness never enforces live regime permissions.** `REGIME_STRATEGY_PERMISSIONS` is live-only; the harness gates on `BT_REGIME_GATE`, an opt-in env var that has never been set in any recorded run. So reported CSM figures always blended in regimes CSM is forbidden from trading.
+
+**The answer.** CSM, forming-bar harness (= live behaviour, 0.5.28), 22 majors, 90 d:
+
+| slice | N | win | E[net] | PF | sum |
+|---|---|---|---|---|---|
+| all regimes — *what every CSM backtest has ever reported* | 747 | 58 % | +0.071 % | **1.08** | +53.0 % |
+| **BULL_TREND — the regime CSM may NOT trade live** | 259 | 61 % | +0.320 % | **1.39** | **+82.9 %** |
+| **live-permitted (RANGING + BEAR)** | 488 | 57 % | −0.061 % | **0.94** | **−29.9 %** |
+| **LIVE, all-time, 314 exits** | 314 | — | — | **0.96** | — |
+
+**Backtest-in-permitted-regimes 0.94 vs live 0.96.** The strategy is behaving exactly as measured. There is no live/backtest gap to explain — the gap was an artefact of scoring the backtest in a regime the bot never lets it trade. Every prior CSM figure in this log (§17.x, §0.4, §0.5.4) carries this defect and overstates CSM by roughly the BULL_TREND contribution.
+
+**Where the loss actually is**, same run:
+
+| slice | N | win | E[net] | PF |
+|---|---|---|---|---|
+| **RANGING + LONG** | 376 | 60 % | **+0.178 %** | **1.20** |
+| RANGING + SHORT | 46 | 33 % | −1.164 % | **0.26** |
+| BEAR + LONG | 35 | 60 % | −0.707 % | 0.49 |
+| BEAR + SHORT | 31 | 48 % | −0.600 % | 0.45 |
+
+Everything CSM earns is RANGING + LONG. Shorts in RANGING lose at PF 0.26 on 46 trades; the whole BEAR_TREND permission loses on 66. This independently reproduces DCB §1.4.1, where long-only beat the shipped config on Delta and shorts contributed nothing (PF 0.99, N 81) — two venues, two datasets, same conclusion, which is much harder to dismiss as data-mining than either alone.
+
+**Not changed.** CSM is parked (cap 0) so nothing is urgent, and `CSM_ALLOW_SHORT=false` + dropping BEAR_TREND is a strategy change that is the operator's call. Pre-registered if it is made: the claim is PF 1.20 on 376 in-sample trades; it must be re-measured on a fresh window before live, and the §17.32 phase rule (≥ 5 scan-phase offsets) applies since the 1.20 comes from one alignment.
+
+**Superseded from 0.5.28.** The repaint fix proposed there is withdrawn — measured, the forming bar is slightly *better* than closed bars (PF 1.08 vs 1.05; one extra hour of lag gives 1.00), because CSM's edge decays faster than the repaint costs. `CSM_CLOSED_BAR_MOM` stays default-off; `BT_FORMING_1H` is the mode that matches live and should be used for every future CSM measurement.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
