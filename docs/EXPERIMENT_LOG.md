@@ -472,6 +472,26 @@ Every losing trade was in RANGING — the regime the operator's own permission s
 
 ---
 
+**0.5.31 NASOS_V4 on a wide universe — backtest and live agree, and BEAR is not the problem (2026-09-24).** §0.5.30 could not judge NASOS on 22 majors (34 trades). Fetched 90 d of 1m for 62 more symbols (`data/*_1m_90d.csv`, 84 total, git-ignored) and re-ran: **441 trades**, real regimes, `BT_FORMING_1H=true`.
+
+| regime | permitted | N | win | avg W | avg L | E[net] | PF | sum |
+|---|---|---|---|---|---|---|---|---|
+| **RANGING** | **NO** | 241 | 64.7 % | +3.78 % | −8.08 % | **−0.402 %** | **0.86** | −96.8 % |
+| BULL_TREND | yes | 117 | 82.9 % | +3.26 % | −8.08 % | +1.321 % | **1.96** | +154.6 % |
+| BEAR_TREND | yes | 83 | 75.9 % | +3.67 % | −7.68 % | +0.939 % | **1.51** | +77.9 % |
+| **permitted (BULL+BEAR)** | | **200** | **80.0 %** | | | **+1.163 %** | **1.74** | +232.5 % |
+| all regimes (the misleading number) | | 441 | 71.7 % | | | +0.308 % | 1.14 | +135.7 % |
+
+**The permission set is already correct.** NASOS earns in both regimes it is allowed to trade (1.96 / 1.51) and loses only in RANGING, which it is already blocked from. All-regime PF 1.14 versus permitted **1.74** — the same artefact as REBALANCING_PREMIUM (§0.5.30): the strategy looks mediocre only because the reported figure blends in a regime it never trades.
+
+**This contradicts the live reading in §0.5.30.** Live gives BEAR N=12 PF 0.35; the backtest gives BEAR N=83 PF 1.51. Twelve trades is not evidence — the earlier statement that "NASOS loses in BEAR, same shape as CSM" was drawn from that sample and is **withdrawn**. CSM's BEAR problem (N=66, PF 0.47 backtest, matching live) stands on its own and does not generalise to NASOS. Live overall N=138 PF 1.16 sits between the all-regime 1.14 and permitted 1.74 because live BEAR is a 12-trade fluke and live RANGING entries exist in the log from before the permission set was tightened.
+
+**Risk profile, unchanged and worth restating:** average win +3.60 %, average loss **−8.02 %** (flat 8 % stop), R:R 0.45. One loss erases ~2.2 wins. The 80 % win rate is not safety; it is the shape of the payoff.
+
+**Conclusion.** NASOS_V4 is the second-strongest thing measured on CSB (permitted PF 1.74, versus TSMOM_4H 1.74 and REBALANCING_PREMIUM 1.50) and it is currently **parked at cap 0** by the §0.5.27 decision. That decision was taken when the only NASOS evidence was a live PF of 1.16 — which is now known to be an all-regime blend. Recorded for the operator; no change made.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
