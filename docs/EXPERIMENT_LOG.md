@@ -364,6 +364,48 @@ The gate's "organic 100 % win" was an artefact of excluding its losses. CSM unde
 
 ---
 
+**0.5.28 CSM audited against the four "LLM backtest" failure modes (2026-09-23).** Operator passed in a generic checklist (look-ahead leak, invisible slippage, overfitting, repainting indicators). Each was measured against this code rather than assumed. Verdict: **three do not apply; the repainting one is real and quantified.**
+
+**Premise correction first.** The checklist assumes "high backtest returns, fails live". CSM never had high backtest returns. The class docstring records Config A at **PF 1.12, E +0.141 %/trade, after-tax NEGATIVE** under 115BBH (break-even PF 1.429). All-time live is PF 0.94 over 314 exits. The gap is 1.12 → 0.94, not "flawless → losing" — and §17.28 already recorded that the one flattering number CSM ever had (78.4 % win rate) came from a broken fast simulator.
+
+**1. Look-ahead / candle-close leak — does not apply; the bias runs the other way.** `run_backtest_1m` slices `df_1h[df_1h.index + _ONE_HOUR <= now]`, i.e. hourly bars are admitted only once CLOSED (`BT_LOOKAHEAD_1H` defaults false). The leak the checklist describes existed, was found on 2026-08-29 and fixed; the comment block at `backtest_optimizer.py:660` records the measurement (BASELINE leaked PF 1.56 → strict 1.22). The harness is now *stricter* than live.
+
+**2. Slippage and spread — modelled and measured, not the gap.** Fees: median round-trip actually paid **0.0800 %** of notional, exactly what `ROUND_TRIP_FEE` assumes. Entry slippage recorded on live fills (N=67): median **+0.0002 %**, p90 +0.003 %. Stop fills (N=7): median **0.0000 %** versus the stop price. At ~$20 notional on Binance majors there is effectively no slippage to find. Caveat recorded: `SLIPPAGE_PCT` **defaults to 0**, so any run that did not set it modelled none — harmless at this size, not harmless if size grows.
+
+**3. Overfitting — the real structural risk, already on the record.** Config A was selected from a **2,744-configuration sweep**. The docstring's own warnings (§17.27) say A is after-tax negative and was kept only because its equity curve is easier to run. Parameter stability has been tested by the §17.32 phase rule and, on DCB, by a 7-offset run (PF 1.17–1.25, mean 1.22). No new measurement today; the honest statement is that CSM's live PF sitting below its backtest PF is exactly what a 2,744-config selection predicts.
+
+**4. Repainting — CONFIRMED, with numbers.** CSM reads `df_1h.iloc[-1]`, the FORMING hourly bar, for both the 24 h change and ATR(14). Reconstructed from 1m data, 12 symbols × 90 d, **14,640 intra-hour readings** at minutes 5/20/35/50:
+
+| | |
+|---|---|
+| median \|drift\| of `normalized_mom` between a mid-hour scan and that hour's final value | **0.208 ATR** |
+| p90 / max drift | 0.687 / 3.62 ATR |
+| entry band width (`CSM_MOM_LO`..`HI`) | 1.00 ATR — so a typical drift is **21 % of the whole band** |
+| mid-hour signals seen in band | 1,944 |
+| still in band at the hour close | 1,392 (**72 %**) |
+| **gone by the close (repainted away)** | 552 (**28 %**) |
+
+So live trades a population the backtest never evaluates: the harness scans hour boundaries with closed bars, live scans every 60 s with a partial bar. Roughly **28 % of live CSM entries are on momentum readings that were never confirmed**.
+
+Live trades bucketed by entry minute-of-hour (N=69 with `entry_time`):
+
+| entry minute | N | win | E[net] | PF |
+|---|---|---|---|---|
+| 0–9 (bar fresh) | 13 | 77 % | +0.119 % | **1.58** |
+| 10–29 | 34 | 65 % | −0.024 % | 0.91 |
+| 30–49 | 14 | 57 % | −0.185 % | 0.43 |
+| 50–59 | 8 | 50 % | −0.246 % | 0.46 |
+
+The gradient is monotonic and points the right way, but **it is not established**: permutation test on fresh-vs-rest gives p = 0.153, Spearman(entry minute, pnl) = −0.102. Recorded as a hypothesis with a mechanism behind it, not a finding.
+
+**Proposed fix, NOT applied (CSM is parked at cap 0, so nothing is urgent).** Two options, in order of preference:
+1. Measure momentum on **closed** hourly bars only (`c1h.iloc[-2]` as the current reference). Live then matches what the backtest measured, and the 28 % is eliminated at source. Cost: entries lag by up to 59 min; §17.32's late-entry work says that is not free.
+2. Teach the **harness** to build the partial 1h bar from 1m up to `now`, so the backtest measures what live actually trades. Costs nothing live, changes every historical CSM number.
+
+Pre-registered before either ships: run both against the existing harness (once the dev box's pandas is usable — numpy was upgraded to 2.5.3 on 09-22 and pandas 2.2.0 no longer imports), and adopt only if the fixed variant's PF over the same 90 d/22-symbol window is ≥ the current strict-harness figure. Do not compare against the pre-2026-08-29 leaked numbers.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
