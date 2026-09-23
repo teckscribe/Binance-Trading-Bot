@@ -440,6 +440,38 @@ Everything CSM earns is RANGING + LONG. Shorts in RANGING lose at PF 0.26 on 46 
 
 ---
 
+**0.5.30 Every strategy re-measured with regimes working, and two of my own verdicts reversed (2026-09-24).** Re-runs after the 0.5.29 fixes. Method for all: `BT_FORMING_1H=true` (live behaviour), real regime series, 22 Binance majors, 90 d, fees 0.08 %, and the risk engine's `MAX_SL_PCT=10 %` rejection now firing as it does live. "Permitted" = the regimes `REGIME_STRATEGY_PERMISSIONS` actually allows.
+
+**TSMOM_4H** — permitted in all but OVERSOLD.
+
+| regime | N | win | avg W | avg L | E[net] | PF |
+|---|---|---|---|---|---|---|
+| RANGING | 343 | 47.8 % | +5.65 % | −3.14 % | +1.063 % | 1.65 |
+| BULL_TREND | 201 | 56.2 % | +5.79 % | −3.73 % | +1.624 % | 1.99 |
+| BEAR_TREND | 57 | 56.1 % | +5.74 % | −4.89 % | +1.073 % | 1.50 |
+| **permitted** | **601** | **51.4 %** | | | **+1.251 %** | **1.74** |
+
+The 09-20 figure (1,066 trades, PF 1.57) was mock-regime and included signals whose stop exceeded 10 %, which live rejects — trade count falls 44 %, PF rises to 1.74. Loses more often than it wins in RANGING and still earns +1.06 %/trade: winners are ~1.8× losers. Worst losing streak **19**. Judge on expectancy, never win rate. Calendar dependence from §1.6.2 is unchanged (July negative on both venues).
+
+**REBALANCING_PREMIUM — my "retire it" recommendation (§1.6.6, §0.5.25) was wrong.**
+
+| regime | N | win | E[net] | PF |
+|---|---|---|---|---|
+| RANGING (**not permitted**) | 447 | 50.1 % | −0.057 % | 0.94 |
+| BULL_TREND | 237 | 53.6 % | +0.253 % | 1.23 |
+| BEAR_TREND | 124 | **67.7 %** | +0.850 % | **2.47** |
+| **permitted (BULL+BEAR)** | **361** | **58.4 %** | **+0.458 %** | **1.50** |
+
+Every losing trade was in RANGING — the regime the operator's own permission set already excludes. Measured where it actually runs it is PF 1.50, not 1.08. The operator's BULL/BEAR choice was correct and my recommendation to retire it was based on a number that mixed in a regime it never trades. BEAR at 67.7 % win / PF 2.47 is the "rebalancing premium" the docstring claims: buying a majors basket after a down day pays best in a falling market.
+
+**NASOS_V4 — the backtest is uninformative at this universe size; use live.** 34 trades in 90 d across 22 majors (21 in permitted regimes) against 138 live trades — NASOS is a dip-buy that needs the 150-symbol universe to find candidates. The permitted-regime backtest reads PF 3.03 on N=21; **that is noise, do not quote it.** Live, N=138: overall win 63.8 %, PF 1.16; **BULL_TREND N=39 PF 1.60; BEAR_TREND N=12 PF 0.35.** The live evidence says NASOS is a BULL strategy that is permitted in BEAR and loses there — same shape as CSM's BEAR problem (§0.5.29). Re-measuring NASOS properly needs 90 d of 1m data for ~150 symbols (~4 GB); not done.
+
+**Delta CSM also moves** (DCB's regime series was fine — the port carried a tz fix CSB lacked — but permissions were never enforced there either): all-regime PF 1.22 → **live-permitted 1.17**; RANGING+LONG **1.20** on 541 trades. DCB §1.4's verdict stands directionally (below the 1.43 bar) but every figure in §1.1–1.6 is an all-regime number and should be read as such.
+
+**The through-line across all four strategies: judging a strategy in regimes it is not allowed to trade has been systematically misleading — in both directions.** It flattered CSM (1.08 all-regime vs 0.94 permitted) and buried REBALANCING_PREMIUM (1.18 vs 1.50). Every future measurement in this log states its permitted-regime figure, and `BT_FORMING_1H=true` is the default mode for any comparison against live.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
