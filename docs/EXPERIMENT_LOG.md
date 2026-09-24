@@ -537,6 +537,30 @@ Every other assignment disagrees across venues: Delta has CSM flat at 1.13–1.1
 
 ---
 
+**0.5.35 The MANUAL_CLOSE exits are the operator taking winners early — and for TSMOM_4H that is fatal (2026-09-24).** Eleven `MANUAL_CLOSE` / `exit_source: manual` exits across both bots (CSB: TSMOM ×4, CSM ×1; DCB: TSMOM ×6), every one profitable. Ruled out in order: restarts (no session boundary matches), `/disable` (only filters new entries, never closes), dashboard square-off (logs `SQUARE_OFF`). Operator confirmed: **"i exited the winner"** — closed by hand in the exchange app. Exits were at +0.21 / 0.28 / 0.35 / 0.42 / 0.46 / 0.55 / 0.57 / 1.11 %.
+
+**What that does to TSMOM_4H.** Its own backtested trades, capping every winner at the manual-exit level and leaving every loser untouched — a deliberately generous bound, since in reality more trades would be cut:
+
+| winners capped at | Binance PF (N 258, BULL+BEAR) | Delta PF (N 2,018, all regimes) |
+|---|---|---|
+| **uncapped — the strategy's own exits** | **1.86** | **1.26** |
+| +0.3 % | **0.10** | **0.06** |
+| +0.5 % | 0.16 | 0.11 |
+| +1.0 % | 0.30 | 0.20 |
+| +2.0 % | 0.57 | 0.37 |
+| +5.0 % | 1.17 | 0.71 |
+
+**Mechanism:** TSMOM is fat-tailed. Delta median trade **−0.42 %**; the top 5 % of trades contribute **182 %** (Binance) and **2,119 %** (Delta) of all profit. Capping wins at a fraction of a percent keeps every loss in full (they still run to the −4 % stop) and removes the tail that pays for them. The observed live record — CSB TSMOM 4/4 wins PF ∞, DCB TSMOM 7 trades PF 9.96 — is **manufactured by the exits, not produced by the strategy**, and is exactly what a destroyed edge looks like while it still feels good.
+
+**Not uniform across strategies:** CSM (R:R ~0.8, profit ladder locks gains by design) loses little to an early manual exit; REBALANCING_PREMIUM targets 3×ATR with ~+2 % average wins. The exposure is specific to **TSMOM_4H** and **NASOS_V4** (avg win +3.6 % against a flat −8 % stop).
+
+**Consequences recorded:**
+1. All 11 manual exits are **excluded** from the §0.5.24 / §0.5.25 40-trade readings — they are operator decisions, not strategy outcomes. TSMOM's live N is therefore 0, not 4.
+2. The §0.5.24 pre-registration is amended: a TSMOM trade counts toward its reading only if it exits via TP_HIT, SL_HIT or MAX_HOLD_24H.
+3. No code change. Recommended to the operator: let TSMOM run to its own exits and reduce position size instead if the open risk is uncomfortable. Not implemented — this is the operator's discretion over their own money, and the numbers above are on the record so the choice is an informed one.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
