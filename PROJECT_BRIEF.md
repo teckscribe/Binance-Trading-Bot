@@ -58,12 +58,14 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 |---|---|---|---|
 | Strategy | Regime (from 2026-09-24) | Entry | Exit |
 |---|---|---|---|
-| **TSMOM_4H** | **BULL_TREND only** | 72h return over 18 closed 4h bars ≥ `TSMOM_MIN_MOM_PCT` (5%); inverse-vol strength | SL 2×/TP 4× ATR(4h), 24h time stop |
+| **TSMOM_4H** | **BULL_TREND + BEAR_TREND** | 72h return over 18 closed 4h bars ≥ `TSMOM_MIN_MOM_PCT` (5%); inverse-vol strength | SL 2×/TP 4× ATR(4h), 24h time stop |
 | **NASOS_V4** | **BULL_TREND only** | Freqtrade port: EWO + RSI dip-buy on 5m | flat 8% SL + 3× ATR TP |
 | **REBALANCING_PREMIUM** | **BEAR_TREND only** | 23:00–00:59 UTC, long each of a fixed 10-major basket, no entry condition | SL = TP = 3× ATR(1h), 24h cycle |
 | **CSM** | **RANGING only** | 24h move in 3.0–4.0 ATR(1h) band + completed-candle volume filter (`vol_ratio ≥ 1.0×`) | Dual-stage hybrid ladder (bar-close stage 1, peak-HWM stages 2–3), ATR trail |
 
-**One regime per strategy** — each is permitted only where it measured best (§0.5.32). OVERSOLD and OVERHEATED: nothing trades.
+**One regime per strategy** — each is permitted only where it measured best (§0.5.32), with one exception: TSMOM_4H also runs in BEAR_TREND (§0.5.34), the only assignment both Binance and Delta agree on (PF 1.50 / 1.56) and the fix for BEAR otherwise having a 2-hour daily entry window. OVERSOLD and OVERHEATED: nothing trades.
+
+Coverage: RANGING 60.6 % of hours (CSM), BULL 23.2 % (NASOS + TSMOM), BEAR 16.2 % (TSMOM + REBALANCING).
 
 *Retired/Archived: ELLIOT_V8 (removed 2026-09-14), WKD, OIB, LIQ, VRP, FF_V2, TP, LLM_ADVISOR.*
 
@@ -160,6 +162,8 @@ The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) 
 3. **My two wrong calls, corrected on the record:** recommending REBALANCING_PREMIUM be retired (it is PF 1.50 where it actually runs, not 1.08), and claiming NASOS loses in BEAR from a 12-trade live sample (83 backtest trades say PF 1.51).
 4. **CSM audited against the four "LLM backtest" failure modes** (§0.5.28): look-ahead — no, the harness is stricter than live; slippage — measured at +0.0002% entry, fees exactly 0.08% as modelled; repainting — real (28% of mid-hour signals vanish by the hour close) but harmless; overfitting — the remaining live explanation, and CSM matches its permitted-regime backtest anyway.
 5. **One regime per strategy** (§0.5.32, operator decision): TSMOM_4H → BULL, NASOS_V4 → BULL, REBALANCING_PREMIUM → BEAR, CSM → RANGING.
+6. **TSMOM_4H added to BEAR** (§0.5.34) — the only cross-venue-agreed assignment (Binance 1.50 / Delta 1.56), and BEAR otherwise had only REBALANCING's 2-hour nightly window.
+7. **Dashboard fix** (§0.5.33): `/api/strategies` ignored `MAX_PER_STRATEGY`, so strategies capped at 0 slots displayed ACTIVE. New CAPPED state.
 
 
 

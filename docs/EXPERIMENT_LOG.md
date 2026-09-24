@@ -520,6 +520,23 @@ Every losing trade was in RANGING — the regime the operator's own permission s
 
 ---
 
+**0.5.34 TSMOM_4H permitted in BEAR_TREND as well (2026-09-24).** The only regime assignment in the §0.5.32 table that **both venues agree on**:
+
+| TSMOM_4H | BULL | RANGING | BEAR |
+|---|---|---|---|
+| Binance (22 majors, N 601) | **1.99** | 1.65 | **1.50** (N 57) |
+| Delta (39 symbols, N 2,018) | 1.38 | 1.16 | **1.56** (N 246) — its best |
+
+Every other assignment disagrees across venues: Delta has CSM flat at 1.13–1.17 in all three regimes (no regime edge at all), and TSMOM's best regime on Delta is BEAR, not BULL. Only REBALANCING_PREMIUM→BEAR and TSMOM→BEAR replicate. Two independent datasets beat one, so this cut is on firmer ground than the rest of the table.
+
+**It also closes a structural hole found by cross-checking the live box.** Under §0.5.32, BEAR_TREND permitted only REBALANCING_PREMIUM — which enters exclusively between 23:00–00:59 UTC. BEAR is ~16 % of hours, so the bot had a ~2 h/day entry window there and was otherwise **structurally idle**, not signal-starved. Coverage before: RANGING 60.6 % (CSM only), BULL 23.2 % (NASOS + TSMOM), BEAR 16.2 % but effectively ~1.4 % of all hours. After: BEAR is covered continuously.
+
+**Live box state at the time of the change** (verified through the factory, overrides, caps and regime together): all four strategies enabled, caps 1 each, `MAX_CONCURRENT=4`, regime BEAR_TREND. Under §0.5.32 only REBALANCING could trade; with this change TSMOM_4H can too.
+
+**Still true and unchanged:** RANGING is 61 % of hours and is covered only by CSM, the weakest of the four (permitted-regime PF 0.94 Binance, live 0.96). That remains the largest open question in the current configuration — §0.5.32 recorded the alternatives measured.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

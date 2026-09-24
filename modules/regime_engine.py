@@ -487,7 +487,7 @@ REGIME_STRATEGY_PERMISSIONS = {
     # forming-bar runs with real regime classification (0.5.29 - 0.5.31):
     #
     #   strategy              BULL   RANGING   BEAR    -> enabled in
-    #   TSMOM_4H (N 601)      1.99     1.65    1.50       BULL_TREND
+    #   TSMOM_4H (N 601)      1.99     1.65    1.50       BULL + BEAR
     #   NASOS_V4 (N 200*)     1.96       --    1.51       BULL_TREND
     #   REBALANCING (N 361)   1.23     0.94    2.47       BEAR_TREND
     #   CSM (N 488)             --     1.03    0.47       RANGING
@@ -500,10 +500,20 @@ REGIME_STRATEGY_PERMISSIONS = {
     # time and leaves RANGING covered only by CSM at PF 1.03. Revisit if the
     # live months disagree.
     #
+    # 2026-09-24, second pass (log 0.5.34): TSMOM_4H added to BEAR_TREND.
+    # Reason it is not just another in-sample cut - it is the ONLY regime
+    # assignment both venues agree on: Binance PF 1.50 (N 57) and Delta PF
+    # 1.56 (N 246), where on Delta it is TSMOM's BEST regime. Every other
+    # assignment in this table disagrees across venues (Delta puts CSM flat at
+    # 1.13-1.17 in all three, and TSMOM's best is BEAR there, not BULL).
+    # It also fixes a structural hole: REBALANCING_PREMIUM only enters between
+    # 23:00-00:59 UTC, so BEAR (16% of hours) had a ~2h/day entry window and
+    # the bot was otherwise idle in it.
+    #
     # All figures are in-sample on one 90d window and one scan-phase alignment;
     # the 17.32 rule (>= 5 offsets) has NOT been run on these cuts.
     "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True,  "REBALANCING_PREMIUM": False},
-    "BEAR_TREND":  {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": True},
+    "BEAR_TREND":  {"CSM": False, "NASOS_V4": False, "TSMOM_4H": True,  "REBALANCING_PREMIUM": True},
     "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
