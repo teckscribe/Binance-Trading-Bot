@@ -492,6 +492,23 @@ Every losing trade was in RANGING — the regime the operator's own permission s
 
 ---
 
+**0.5.32 One regime per strategy (operator decision, 2026-09-24).** Each strategy is now permitted only in the single regime where it measured best across §0.5.29–§0.5.31:
+
+| regime | enabled | PF there | runner-up regime it gives up |
+|---|---|---|---|
+| **BULL_TREND** | TSMOM_4H, NASOS_V4 | 1.99, 1.96 | — |
+| **BEAR_TREND** | REBALANCING_PREMIUM | 2.47 | BULL 1.23 |
+| **RANGING** | CSM | 1.03 (long-only 1.20) | — |
+| OVERSOLD / OVERHEATED | nothing | | |
+
+`modules/regime_engine.py` updated; the reasoning table and the cost below are in the code comment so the next reader sees it without the log.
+
+**Cost, stated before the change and accepted by the operator:** TSMOM_4H in RANGING was **343 trades at PF 1.65, +364 % summed** — the single largest profit block measured today — and RANGING is ~61 % of all hours. Confining TSMOM to BULL idles it most of the time and leaves RANGING covered only by CSM at PF 1.03. Measured on the same data, the pooled alternatives were: one-regime split **PF 1.56 / 747 trades** versus the previous permission set **PF 1.49 / 1,450 trades** — better per trade, roughly half the volume and lower total return. A third option not taken (keep TSMOM everywhere, keep REBALANCING BULL+BEAR, restrict only CSM to RANGING+LONG) measured ~1.55 at ~1,400 trades.
+
+**Caveats carried forward:** every cut is in-sample on one 90 d window at one scan-phase alignment; §17.32 (≥ 5 offsets) has not been run on them. TSMOM_4H remains calendar-driven (July negative on both venues). NASOS_V4 and CSM are still capped at 0 in `settings.json` (§0.5.27) — regime permission alone does not re-enable them; that is a separate operator action on the box.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

@@ -482,14 +482,29 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
-    # TSMOM_4H: DCB 1.6 measured positive in all three (BEAR +1.06%, BULL +0.98%,
-    # RANGING +0.37% per trade) but the edge is calendar-driven (July < 1 on both
-    # venues) - read it by month, not by regime.
-    # REBALANCING_PREMIUM: operator choice 2026-09-20 (log 0.5.25); DCB 1.6 has it
-    # at PF 1.08/1.17 and negative in RANGING - BULL/BEAR only, 1 slot.
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True, "REBALANCING_PREMIUM": True},
-    "BEAR_TREND":  {"CSM": True,  "NASOS_V4": True,  "TSMOM_4H": True, "REBALANCING_PREMIUM": True},
-    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": True, "REBALANCING_PREMIUM": False},
+    # ONE REGIME PER STRATEGY - operator decision 2026-09-24 (log 0.5.32).
+    # Each strategy is permitted only where it measured best, from the 90d
+    # forming-bar runs with real regime classification (0.5.29 - 0.5.31):
+    #
+    #   strategy              BULL   RANGING   BEAR    -> enabled in
+    #   TSMOM_4H (N 601)      1.99     1.65    1.50       BULL_TREND
+    #   NASOS_V4 (N 200*)     1.96       --    1.51       BULL_TREND
+    #   REBALANCING (N 361)   1.23     0.94    2.47       BEAR_TREND
+    #   CSM (N 488)             --     1.03    0.47       RANGING
+    #   (* NASOS was never permitted in RANGING; its 241 RANGING trades
+    #      backtest at 0.86, which is why.)
+    #
+    # KNOWN COST, accepted by the operator: TSMOM_4H in RANGING was 343 trades
+    # at PF 1.65 (+364% summed) - the single largest profit block measured, and
+    # RANGING is ~61% of all hours. Confining TSMOM to BULL idles it most of the
+    # time and leaves RANGING covered only by CSM at PF 1.03. Revisit if the
+    # live months disagree.
+    #
+    # All figures are in-sample on one 90d window and one scan-phase alignment;
+    # the 17.32 rule (>= 5 offsets) has NOT been run on these cuts.
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True,  "REBALANCING_PREMIUM": False},
+    "BEAR_TREND":  {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": True},
+    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
     # enough in the 90d window that it carries no measurement at all. Leaving it

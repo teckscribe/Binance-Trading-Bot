@@ -1,6 +1,6 @@
 # ⚡ Binance Futures AI Trading Terminal — System Brief (CSB)
 
-*Last updated: 2026-09-12 — Production Release + Audit Hardening (CSM Hybrid Ladder, Monotone HWM Peak Tracking, Regime Permission Updates, Relocation-Proof Tools)*
+*Last updated: 2026-09-24 — four strategies, one regime each; all backtest evidence re-measured after two harness defects were fixed (EXPERIMENT_LOG §0.5.29–§0.5.32)*
 
 ---
 
@@ -56,8 +56,14 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 
 | Strategy ID | Strategy Name | Entry Mechanism | Exit & Stop Management |
 |---|---|---|---|
-| **CSM** | Cross-Sectional Momentum | 24h move in 3.0–4.0 ATR(1h) band + **Completed-Candle Volume Expansion Filter** (`vol_ratio >= 1.0x` 24h avg). | **Dual-Stage Hybrid Ladder**: Stage 1 (+1.0% → +0.15% lock) on 15m bar close; Stages 2 & 3 (+2.5% → +1.50%, +4.0% → +2.50%) on Peak HWM; ATR trailing stop; HWM entry-candle guard. |
-| **NASOS_V4** | Freqtrade NASOS Port | Multi-timeframe trend & momentum confirmation with ATR breakout. | Dynamic SL + ATR trailing profit targets. |
+| Strategy | Regime (from 2026-09-24) | Entry | Exit |
+|---|---|---|---|
+| **TSMOM_4H** | **BULL_TREND only** | 72h return over 18 closed 4h bars ≥ `TSMOM_MIN_MOM_PCT` (5%); inverse-vol strength | SL 2×/TP 4× ATR(4h), 24h time stop |
+| **NASOS_V4** | **BULL_TREND only** | Freqtrade port: EWO + RSI dip-buy on 5m | flat 8% SL + 3× ATR TP |
+| **REBALANCING_PREMIUM** | **BEAR_TREND only** | 23:00–00:59 UTC, long each of a fixed 10-major basket, no entry condition | SL = TP = 3× ATR(1h), 24h cycle |
+| **CSM** | **RANGING only** | 24h move in 3.0–4.0 ATR(1h) band + completed-candle volume filter (`vol_ratio ≥ 1.0×`) | Dual-stage hybrid ladder (bar-close stage 1, peak-HWM stages 2–3), ATR trail |
+
+**One regime per strategy** — each is permitted only where it measured best (§0.5.32). OVERSOLD and OVERHEATED: nothing trades.
 
 *Retired/Archived: ELLIOT_V8 (removed 2026-09-14), WKD, OIB, LIQ, VRP, FF_V2, TP, LLM_ADVISOR.*
 
@@ -65,14 +71,50 @@ econcile_with_exchange): detects manual closes and instantly closes unmanaged or
 
 ## 📊 4. Backtest Evidence & Edge Verification
 
-Across extensive 90-day leak-free backtests (100 symbols, 0.08% taker fees, 0.03%/side slippage, compounding risk model):
+**All prior figures in this section were withdrawn on 2026-09-24.** Two harness
+defects made every earlier number unusable (EXPERIMENT_LOG §0.5.29):
 
-- **CSM Hybrid Model in RANGING**: Delivered **+666.0% ~ +719.7% net return** with a win rate of **66.3%** and max losing streak of only 11 trades.
-- **Volume Filter Impact**: Requiring VOL_RATIO_MIN = 1.0 on the last completed 1h candle eliminates illiquid false breakouts and increases trade expectancy.
-- **Bar-Close vs HWM Hybrid**:
-  - Evaluating Stage 1 (+1.0%) on completed 15m bar close eliminates 1-second noise premature breakeven exits.
-  - Evaluating Stages 2 (+2.5%) & 3 (+4.0%) on Peak HWM instantly captures rapid intra-bar wick expansions.
-- **Regime Gating**: In confirmed BULL_TREND squeezes, CSM was found to lose −130.5% (short wicks squeezed, late longs top-ticked). In RANGING, CSM delivers the +666%–+719% result. In BEAR_TREND, the 90-day backtest measured −0.144%/trade (−111.9% cumulative, 778 trades). CSM is gated **RANGING + BEAR_TREND** from 2026-09-12; BEAR_TREND is a live monitoring experiment with the measured backtest baseline above as the decision threshold (EXPERIMENT_LOG §0.2.11).
+1. `build_regime_series()` compared a tz-aware funding index against a tz-naive
+   bar index, threw, and `main()` silently fell back to a **mock BULL_TREND**
+   regime. Every CSM figure ever recorded scored a RANGING/BEAR strategy as
+   though the market were permanently bullish.
+2. The harness never enforced `REGIME_STRATEGY_PERMISSIONS` — the gate is an
+   opt-in env var that no recorded run ever set — so reported figures blended
+   in regimes the bot does not allow.
+
+Both fixed. Current method for every figure below: real regime classification
+(2,135 hourly bars: RANGING 60.6%, BULL 23.2%, BEAR 16.2%), `BT_FORMING_1H=true`
+so the harness hands strategies the **forming** hourly bar exactly as the live
+feed does, 90 days, 0.08% round-trip fees, and the live `MAX_SL_PCT=10%`
+rejection active.
+
+| Strategy | Universe | N | Win | E[net]/trade | **PF in its enabled regime** |
+|---|---|---|---|---|---|
+| **TSMOM_4H** — BULL | 22 majors | 201 | 56.2% | +1.62% | **1.99** |
+| **NASOS_V4** — BULL | 84 symbols | 117 | 82.9% | +1.32% | **1.96** |
+| **REBALANCING_PREMIUM** — BEAR | 22 majors | 124 | 67.7% | +0.85% | **2.47** |
+| **CSM** — RANGING | 22 majors | 422 | 56.9% | +0.03% | **1.03** (long-only: 1.20) |
+
+**The regime is the whole story.** Measured across all regimes instead, the same
+strategies read 1.74 / 1.14 / 1.18 / 1.08 — NASOS and REBALANCING_PREMIUM look
+mediocre only because the blended figure includes regimes they never trade
+(NASOS in RANGING: PF 0.86 over 241 trades; REBALANCING in RANGING: 0.94 over
+447). CSM is the reverse: its all-regime 1.08 is flattered by BULL_TREND
+(PF 1.39), which it is forbidden from trading; in its own regimes it is 0.94,
+and **live over 314 real trades it is 0.96** — the strategy matches its
+measurement exactly once the measurement is done properly.
+
+**CSM's loss is specific:** RANGING+LONG is PF 1.20, RANGING+SHORT is **0.26**,
+and all of BEAR_TREND is negative. DCB's independent Delta sweep reached the
+same conclusion (long-only best, shorts contributed nothing) — two venues, two
+datasets.
+
+**Caveats that apply to every number above:** one 90-day in-sample window, one
+scan-phase alignment; the §17.32 rule (≥5 offsets) has **not** been run on these
+regime cuts. TSMOM_4H is calendar-driven — July was negative on both Binance and
+Delta — so judge it by month, not by regime. NASOS_V4's payoff is lopsided
+(avg win +3.6%, avg loss −8.0%): one loss erases roughly two wins, and its 80%
+win rate is not safety.
 
 ---
 
@@ -111,6 +153,15 @@ The system runs on a 24×7 Ubuntu 24.04 desktop (operated remotely via AnyDesk) 
 ---
 
 ## 📝 7. Changelog
+
+### Regime re-measurement & one-regime-per-strategy — 2026-09-24
+1. **Two harness defects fixed** (§0.5.29): regime classification had been silently dead (tz-aware/naive mismatch → mock BULL_TREND fallback); the harness never enforced live regime permissions. Missing `{BTC,ETH,SOL}USDT_1h_90d.csv` fetched. New `BT_FORMING_1H` reproduces the live forming hourly bar; `CSM_CLOSED_BAR_MOM` added (default off) after the repaint hypothesis was measured and **withdrawn** — the forming bar is slightly better than closed bars (1.08 vs 1.05).
+2. **Every strategy re-measured** (§0.5.30, §0.5.31). 62 more symbols fetched (84 total) so NASOS could be judged on 441 trades instead of 34.
+3. **My two wrong calls, corrected on the record:** recommending REBALANCING_PREMIUM be retired (it is PF 1.50 where it actually runs, not 1.08), and claiming NASOS loses in BEAR from a 12-trade live sample (83 backtest trades say PF 1.51).
+4. **CSM audited against the four "LLM backtest" failure modes** (§0.5.28): look-ahead — no, the harness is stricter than live; slippage — measured at +0.0002% entry, fees exactly 0.08% as modelled; repainting — real (28% of mid-hour signals vanish by the hour close) but harmless; overfitting — the remaining live explanation, and CSM matches its permitted-regime backtest anyway.
+5. **One regime per strategy** (§0.5.32, operator decision): TSMOM_4H → BULL, NASOS_V4 → BULL, REBALANCING_PREMIUM → BEAR, CSM → RANGING.
+
+
 
 ### Production Release — 2026-09-11 20:30 IST
 1. **Hybrid CSM Stop Ratchet**: Implemented 2-stage hybrid ladder (Stage 1 bar-close stability + Stages 2/3 Peak HWM wick capture).
