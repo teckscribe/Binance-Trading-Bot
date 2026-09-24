@@ -509,6 +509,17 @@ Every losing trade was in RANGING — the regime the operator's own permission s
 
 ---
 
+**0.5.33 Dashboard reported strategies ACTIVE that could not trade (2026-09-24).** Operator saw all four strategies ACTIVE on the web dashboard. Two causes:
+
+1. **Not a bug:** the box was in BEAR_TREND and still runs the pre-0.5.32 permission table, where BEAR_TREND permitted all four. Correct for the code deployed; the one-regime table has not been pulled yet.
+2. **A real bug:** `/api/strategies` promises "whether each one can currently take a trade" but only consulted the regime table — it ignored `MAX_PER_STRATEGY`. CSM and NASOS_V4 are capped at **0 slots** (§0.5.27) and cannot open a position, yet showed ACTIVE. Added a **CAPPED** state (cap 0, ahead of the OFF/IDLE/ACTIVE checks) and surfaced `cap` in the payload; the card now reads "MAX_PER_STRATEGY gives it 0 slots · cannot open a position", and ACTIVE cards show their slot count.
+
+**Third finding, from `data/strategy_overrides.json`:** three strategies are also manually disabled via Telegram/Discord — CSM and NASOS_V4 since 09-21 06:20, and **REBALANCING_PREMIUM since 09-22 05:20** (immediately after its SOLUSD SL_HIT). TSMOM_4H was re-enabled 09-23 14:34. With the corrected endpoint the true state of the box is CSM/NASOS/REBALANCING **DISABLED**, TSMOM_4H **IDLE** (waiting for BULL_TREND) — **nothing has been able to trade**, which matches `n_open: 0`. Flagged to the operator; not changed.
+
+**Checked and ruled out:** `is_disabled()` is read only by `StrategyFactory.get_for_regime()` (entry filtering) and the dashboard — disabling a strategy stops new entries but does **not** close open positions. So the unexplained TSMOM_4H `MANUAL_CLOSE` exits on both CSB and DCB are still unexplained; the disable theory is wrong.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

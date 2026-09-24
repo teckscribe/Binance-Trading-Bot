@@ -287,6 +287,11 @@ async function fetchStrategies() {
                 why = `Waiting for ${(s.permitted_in || []).join(' / ')}`;
             } else if (s.status === 'DISABLED') {
                 why = 'Manually disabled via Telegram/Discord';
+            } else if (s.status === 'CAPPED') {
+                why = 'MAX_PER_STRATEGY gives it 0 slots &middot; cannot open a position';
+            } else if (active) {
+                why = `${s.tier} &middot; ${s.desc}` +
+                      (s.cap ? ` &middot; ${s.cap} slot${s.cap > 1 ? 's' : ''}` : '');
             }
             return `<div class="ai-card">
                 <div class="ai-title">${s.name} (${s.id})</div>

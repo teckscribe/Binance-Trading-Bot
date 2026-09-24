@@ -113,11 +113,18 @@ async def get_strategies():
     The strategies actually loaded by the engine and whether each one can
     currently take a trade.
 
-    Four states, narrowest cause first:
+    Five states, narrowest cause first:
       DISABLED  manually switched off via Telegram/Discord (strategy_overrides)
+      CAPPED    MAX_PER_STRATEGY gives it 0 slots — it cannot open anything
       OFF       permitted in NO regime — turned off by config, not by market
       IDLE      permitted somewhere, but not in the regime running right now
-      ACTIVE    permitted in the current regime and able to fire
+      ACTIVE    permitted in the current regime, has slots, able to fire
+
+    CAPPED added 2026-09-24: the endpoint promises "whether each one can
+    currently take a trade" but only ever consulted the regime table, so CSM
+    and NASOS_V4 showed ACTIVE while capped at 0 by the 0.5.27 parking
+    decision — the dashboard claimed four live strategies when two of them
+    could not open a position.
     """
     try:
         from modules.strategies.strategy_factory import StrategyFactory
@@ -147,6 +154,18 @@ async def get_strategies():
         except Exception:
             pass
 
+    # Per-strategy slot caps. A cap of 0 means the scanner will never open a
+    # position for that strategy, whatever the regime says.
+    caps = {}
+    try:
+        from modules import settings_manager as _cfg
+        caps = _cfg.get("MAX_PER_STRATEGY") or {}
+        if isinstance(caps, str):
+            caps = {k.strip(): int(v) for k, v in
+                    (p.split(":", 1) for p in caps.split(",") if ":" in p)}
+    except Exception:
+        caps = {}
+
     out = []
     for sid in ids:
         name, tier, desc, colour = _STRATEGY_META.get(
@@ -154,8 +173,11 @@ async def get_strategies():
 
         permitted_in = sorted(r for r, m in _PERMS.items() if m.get(sid, False))
 
+        cap = caps.get(sid)
         if is_disabled(sid):
             status = "DISABLED"
+        elif cap == 0:
+            status = "CAPPED"
         elif not permitted_in:
             status = "OFF"
         elif regime in permitted_in:
@@ -168,6 +190,7 @@ async def get_strategies():
             "colour": colour,
             "status": status,
             "permitted_in": permitted_in,
+            "cap": cap,
         })
 
     return {
