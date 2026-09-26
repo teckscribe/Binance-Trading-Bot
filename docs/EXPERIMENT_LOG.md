@@ -561,6 +561,41 @@ Every other assignment disagrees across venues: Delta has CSM flat at 1.13–1.1
 
 ---
 
+**0.5.36 Why live trails the backtest: the profit ladder is a FIXED percentage while the stop is ATR-scaled (2026-09-26).** Operator asked why the system underperforms its backtest. Answer found, and it is not Kronos, fees, slippage or the universe.
+
+**First, a unit correction to §0.5.29.** That entry compared live PF 0.96 against backtest 0.94 and concluded "no gap". Those are different quantities: `pnl_equity_pct` is % of account (scaled by position size, which risk-sizing varies inversely with stop distance), while the backtest's `net_pct` is price-move % net of fees (size-independent). In the backtest's own unit, live CSM in RANGING is **PF 0.86**, not 0.96. There *is* a gap. Every live/backtest comparison from here on uses price-move %.
+
+**The discriminating measurement.** Live CSM, bucketed by planned stop width (the ladder's stage-1 trigger is a fixed +1.0 %):
+
+| stop width | stage-1 trigger as % of stop | N | win | avgW | avgL | R:R | **PF** |
+|---|---|---|---|---|---|---|---|
+| ≤ 2.5 % (the floor) | 49 % | 23 | 65 % | +1.76 % | −1.91 % | 0.92 | **1.73** |
+| 2.5–4 % | 30 % | 23 | 65 % | +1.73 % | −3.57 % | 0.48 | 0.91 |
+| 4–6 % | 19 % | 18 | 67 % | +1.33 % | −5.20 % | 0.26 | 0.51 |
+| > 6 % | 12 % | 21 | 71 % | +1.42 % | −7.84 % | 0.18 | 0.45 |
+
+**Live CSM is strongly profitable (PF 1.73) on floor-stop trades and collapses monotonically as the stop widens.** Win rate is flat at 65–71 % throughout and average win is flat at ~+1.5 %, while average loss scales straight with the stop.
+
+Same bucketing on the backtest (84 symbols, RANGING, N 1,955) — PF 1.04 / 1.14 / 1.02 / 0.81 — a much milder decline, **and the reason is visible in one column**: backtest avgW *scales with the stop* (+1.63 → +2.46 → +3.62 → +4.46 %), live avgW does **not** (+1.76 → +1.73 → +1.33 → +1.42 %).
+
+**Mechanism.** `_LADDER_RUNGS` are absolute percentages — (+1.0 % → lock +0.15 %), (+2.5 % → +1.50 %), (+4.0 % → +2.50 %) — while `sl_price` is 2×ATR(15m) floored at 2 %. On a floor-stop coin, stage 1 sits at ~half the risk distance: sensible. On NOMUSDT (ATR/entry 4.18 %, stop 8.37 %) stage 1 sits at **12 % of the risk distance** — the trade risks 8.37 % to lock 0.15 %. Live checks this every second (`FAST_INTERVAL_SECONDS=1`) against the mark price, so any transient +1.0 % pop arms it; the harness steps hourly and mostly never sees the pop. NOMUSDT was traded four times on 09-24, every one a `TRAIL_HIT` after 4–12 minutes for +0.12 % to +0.18 % of equity.
+
+**This is the same defect already fixed for breakeven and never fixed for the ladder.** `BaseStrategy.breakeven_trigger()` carries the finding verbatim: *"The fixed percentage triggers were calibrated on nothing in particular and are far inside the noise band of a volatile alt. Live, checking a 5s mark price, 84 % of CSM trades armed breakeven on a random pop and were then stopped out at ~0 on the retrace — versus 29 % in the backtest… That amputates the right tail CSM's entire edge depends on."* BE was made ATR-scaled. The ladder was left absolute.
+
+**Why the universe hypothesis I floated first was wrong.** Live median stop is 6.01 % against the backtest's 2.02 %, and only 10 of 22 live-traded symbols are in the 84-symbol data set — but re-running CSM on all 84 gave median stop **2.02 %** and PF 1.01, i.e. widening the backtest universe did not reproduce live's stop distribution. The live bot scans ~150 symbols and CSM's own entry rule (a 3–4 ATR 24 h move plus volume expansion) *selects for* the most volatile names in it. The universe matters only through that selection; the damage is done by the fixed ladder.
+
+**Two candidate fixes, neither applied — CSM is live with real money.**
+1. **ATR-scale the ladder** (preferred; mirrors the BE precedent): express the rungs as fractions of the stop distance, e.g. 0.5× / 1.25× / 2.0×, so stage 1 always sits at the same risk-relative point.
+2. **Cap the stop width**: reject CSM signals where 2×ATR exceeds ~3 %, confining it to the region the backtest actually measured (backtest stop ≤ 3 %: N 1,472, PF 1.05; live ≤ 2.5 %: PF 1.73). Cruder, and throws away ~60 % of live signals.
+
+Pre-registered before either ships: measure it on the harness with `BT_FORMING_1H=true`, and note the harness **understates** this effect by design (hourly steps cannot see the 1-second pops that arm the ladder live), so a backtest improvement is a lower bound. `FAST_INTERVAL_SECONDS=1` is what makes the live ladder so trigger-happy; a fix that only slows the check would trade one bias for another.
+
+**Also measured today.** Kronos 168/80 matched and whale 169/120 — both READY, both verdicts already negative on CSM. TSMOM_4H has 30,642 scored candidates but only **6** matched outcomes. Since 09-21 the account is **+0.44 USD, PF 1.11 in equity terms** (all-time −0.20 USD) — the risk engine is absorbing the wide-stop losses by sizing down, which is why the account looks flat while the price-terms PF is 0.85.
+
+**Correction to §0.5.35.** The −306.7 % historically attributed to `MANUAL_CLOSE` was **not** operator behaviour: decomposed, 64 of those exits sat on the stop price (mislabelled stop fills, mean −4.74 %, total −303.4 %) and the 194 genuine operator closes total **−3.3 %** — essentially neutral. The §0.5.35 warning about exiting TSMOM winners still stands on its own arithmetic; the historical damage claim does not.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
