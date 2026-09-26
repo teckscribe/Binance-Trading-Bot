@@ -596,6 +596,40 @@ Pre-registered before either ships: measure it on the harness with `BT_FORMING_1
 
 ---
 
+**0.5.37 Both fixes measured. The ladder fix is rejected; the stop cap ships. And §0.5.36's diagnosis was wrong (2026-09-26).**
+
+Two changes were implemented behind settings and measured four ways on 84 symbols / 90 d / RANGING / `BT_FORMING_1H=true`:
+
+| config | N | win | avgW | avgL | R:R | PF | **E[net]** |
+|---|---|---|---|---|---|---|---|
+| base (fixed-% ladder, no cap) | 1,955 | 56.9 % | +2.16 % | −2.83 % | 0.77 | 1.01 | **+0.0146 %** |
+| **ATR ladder only** | 1,909 | 54.7 % | +2.42 % | −2.99 % | **0.81** | **0.98** | **−0.0324 %** |
+| cap 3 % only | 1,500 | 56.3 % | +1.67 % | −2.10 % | 0.79 | 1.02 | +0.0196 % |
+| ATR ladder + cap 3 % | 1,495 | 55.3 % | +1.74 % | −2.11 % | 0.82 | 1.02 | +0.0158 % |
+
+**The ATR ladder is rejected.** The predicted mechanism is visibly real — winners run further (+2.16 → +2.42 %) and R:R improves (0.77 → 0.81) — but PF *falls* and expectancy goes negative. The wide-stop buckets it was designed to rescue get worse (4–6 %: 1.02 → 0.90; > 6 %: 0.81 → 0.70). Reason: on a wide-stop trade the early fixed lock was acting as **protection**, and removing it lets those trades run back to the full stop. Code kept with default `pct`, annotated as measured-and-rejected so it is not re-proposed.
+
+**§0.5.36's diagnosis was wrong.** It attributed the live/backtest gap to the fixed ladder capping winners. Fixing exactly that made things worse, so the ladder is not the cause. Two things are true instead:
+
+1. **The comparison baseline was wrong.** The PF 1.17 that live was being measured against came from **22 majors**. On the universe the bot actually trades (84 symbols) the backtest is **PF 1.01, E +0.0146 %/trade** — barely break-even. Live CSM RANGING is **0.86 on 68 trades**, which is well inside noise of 1.01. **Most of the "gap" was an artefact of comparing against a majors-only number.** CSM does not have much edge on the live universe, in the backtest either.
+2. **The stop-width gradient is real and is the one actionable lever.** Both datasets agree, and they agree on where the damage is:
+
+| cap | backtest N | backtest PF | backtest E[net] | live N | live PF |
+|---|---|---|---|---|---|
+| none | 1,955 | 1.01 | +0.0146 % | 68 | 0.86 |
+| ≤ 6 % | 1,812 | 1.06 | +0.0662 % | 51 | 1.18 |
+| **≤ 5 %** | **1,761** | **1.06** | **+0.0654 %** | 43 | **1.55** |
+| ≤ 4 % | 1,670 | 1.07 | +0.0690 % | 38 | 1.36 |
+| ≤ 3 % | 1,472 | 1.05 | +0.0421 % | 22 | 2.33 |
+
+**Shipped: `CSM_MAX_SL_PCT = 0.05`.** Expectancy 4.5× (+0.0146 % → +0.0654 %/trade) while keeping 90 % of signals. The backtest curve is flat from 4 % to 6 %, so 5 % is the middle of the plateau rather than the in-sample peak — deliberately not the best single value. Live agrees in direction on N 68.
+
+**Caveats on the record.** The cap was chosen by scanning a parameter on the same 90 d it is measured on; the flat plateau is the only thing protecting it from being a pure overfit, and §17.32 (≥ 5 scan-phase offsets) has not been run on it. The live column is N 43–68 and is indicative, not evidence. Filtering the cached base run is exact for a rejection rule, but ignores that rejected signals would have freed slots for other trades.
+
+**Correction count on this question:** §0.5.29 compared the wrong units, §0.5.36 named the wrong cause. The measurement that settled it is the four-way run above; the durable finding is (1) above — CSM's real backtest expectancy on its own trading universe is +0.015 %/trade before this change, and +0.065 % after.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

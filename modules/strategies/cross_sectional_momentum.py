@@ -79,10 +79,49 @@ from modules.strategies.base_strategy import BaseStrategy
 #   CSM_PROFIT_LADDER / CSM_LEGACY_BE   stop management, see manage()
 
 # ── Profit ladder — ON for Hybrid Model ────────────────────────────────────
+#
+# TWO EXPRESSIONS OF THE SAME RUNGS. See EXPERIMENT_LOG 0.5.36.
+#
+# The absolute rungs below were calibrated when almost every trade sat on the
+# 2% MIN_SL floor. The stop is 2xATR(15m) floored at 2%, so on a quiet major
+# stage 1 (+1.0%) sits at half the risk distance -- sensible. On a volatile alt
+# with ATR/entry 4.2% the stop is 8.4% and stage 1 sits at 12% of the risk
+# distance: the trade risks 8.4% to lock 0.15%. Live checks this every second
+# against the mark price, so any transient pop arms it; the hourly harness
+# mostly never sees the pop. Measured live, CSM is PF 1.73 on floor-stop trades
+# and 0.45 on >6% stops, with average WIN flat at ~+1.5% across every bucket
+# while average loss tracks the stop.
+#
+# Expressed as fractions of the stop distance R, the absolute rungs ARE
+# 0.5R/1.25R/2.0R with locks 0.075R/0.75R/1.25R -- exactly, at a 2% stop. So
+# "atr" mode is not a new calibration: it is the same ladder, anchored to risk
+# instead of to price, and identical to "pct" wherever the stop is at the floor.
+#
+# This mirrors BaseStrategy.breakeven_trigger(), which was ATR-scaled for this
+# same reason; the ladder was left absolute.
+#
+# MEASURED AND REJECTED, 2026-09-26 (log 0.5.37). "atr" mode was built to fix
+# the wide-stop collapse and it does NOT: on 84 symbols / 90d it moves R:R
+# 0.77 -> 0.81 and avgW +2.16% -> +2.42% exactly as predicted, but PF falls
+# 1.01 -> 0.98 and expectancy goes NEGATIVE (+0.0146% -> -0.0324%/trade).
+# The wide-stop buckets get worse, not better (4-6%: 1.02 -> 0.90; >6%:
+# 0.81 -> 0.70), because the early fixed lock was acting as PROTECTION there
+# and removing it lets those trades run back to the full stop. What actually
+# works is not taking the wide-stop trades at all -- CSM_MAX_SL_PCT.
+# Kept, default "pct", so the measurement is reproducible. Do not enable
+# without re-measuring.
 _LADDER_RUNGS = [
     (0.010, 0.0015),      # Stage 1: +1.0% gain -> lock +0.15% (Risk-free Breakeven + fees)
     (0.025, 0.0150),      # Stage 2: +2.5% gain -> lock +1.50% profit
     (0.040, 0.0250),      # Stage 3: +4.0% gain -> lock +2.50% profit
+]
+
+# (trigger, lock) as multiples of the stop distance R. Equivalent to the rungs
+# above at a 2% stop; scales with risk everywhere else.
+_LADDER_RUNGS_R = [
+    (0.50, 0.075),
+    (1.25, 0.750),
+    (2.00, 1.250),
 ]
 TRAIL_ATR_MULT = 2.0
 
@@ -199,6 +238,14 @@ class CrossSectionalMomentum(BaseStrategy):
             return None
 
         sl_dist = max(raw_sl_dist, min_sl_dist)
+
+        # CSM_MAX_SL_PCT: reject signals whose stop is wider than this fraction
+        # of entry. 0 = off. Live CSM is PF 1.73 on stops <=2.5% and 0.45 on
+        # stops >6% (0.5.36); this confines it to the region the backtest
+        # actually measured, at the cost of most of its signal volume.
+        _max_sl = cfg.get("CSM_MAX_SL_PCT")
+        if _max_sl and sl_dist / entry_price > _max_sl:
+            return None
         scale = sl_dist / raw_sl_dist if raw_sl_dist > 0 else 1.0
         effective_atr = atr_15 * scale
         tp_mult = TP_ATR_MULT if direction == "LONG" else TP_ATR_MULT_SHORT
@@ -241,6 +288,19 @@ class CrossSectionalMomentum(BaseStrategy):
 
         MAX_HOLD_MIN = cfg.get("CSM_MAX_HOLD_MIN")
         PROFIT_LADDER = _LADDER_RUNGS if cfg.get("CSM_PROFIT_LADDER") == "on" else []
+        # "atr": rungs are multiples of this position's own stop distance R,
+        # measured from the INITIAL stop so the ladder cannot chase its own
+        # ratchet. Falls back to the absolute rungs when R is unavailable.
+        _R = 0.0
+        if PROFIT_LADDER and cfg.get("CSM_LADDER_MODE") == "atr":
+            try:
+                _isl = float(position.get("initial_sl_price") or 0.0)
+                if _isl > 0 and entry_price > 0:
+                    _R = abs(entry_price - _isl) / entry_price
+            except (TypeError, ValueError):
+                _R = 0.0
+            if _R > 0:
+                PROFIT_LADDER = [(t * _R, k * _R) for t, k in _LADDER_RUNGS_R]
         LEGACY_BREAKEVEN = cfg.get("CSM_LEGACY_BE")
 
         # --- Max hold time: close flat trades after MAX_HOLD_MIN to free slots ---
@@ -322,7 +382,8 @@ class CrossSectionalMomentum(BaseStrategy):
                 # at +1.0% would lock +0.15% and get stopped out on normal jitter. Stage 2/3
                 # have wider lock gaps (1.0% / 1.5%) that tolerate normal retrace after a
                 # peak, so they can safely fire on HWM.
-                eval_gain = gain if trigger_pct < LADDER_HWM_TRIGGER_THRESHOLD else hwm
+                _hwm_thr = (LADDER_HWM_TRIGGER_THRESHOLD / 0.02) * _R if _R > 0                            else LADDER_HWM_TRIGGER_THRESHOLD
+                eval_gain = gain if trigger_pct < _hwm_thr else hwm
                 if eval_gain >= trigger_pct:
                     locked = entry_price * (1 + lock_pct) if direction == "LONG" \
                              else entry_price * (1 - lock_pct)

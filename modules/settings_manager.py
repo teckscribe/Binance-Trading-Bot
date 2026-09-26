@@ -162,6 +162,18 @@ SPEC = [
        "are skipped.", min=0.001, max=0.5, step="0.001"),
     _s("CSM_MAX_HOLD_MIN", "CSM", "int", 1440, "Max hold (min)",
        "480 = 8h, 1440 = 24h.", min=30, max=10080),
+    _s("CSM_LADDER_MODE", "CSM", "choice", "pct", "Ladder rung units",
+       "pct = absolute rungs (+1.0/2.5/4.0%), the shipped behaviour. "
+       "atr = the same rungs as multiples of the stop distance (0.5/1.25/2.0R), "
+       "identical at a 2% stop and risk-proportional above it. Log 0.5.36.",
+       options=["pct", "atr"]),
+    _s("CSM_MAX_SL_PCT", "CSM", "float", 0.05, "Max stop width (fraction)",
+       "0 = off. Rejects CSM signals whose stop exceeds this fraction of entry. "
+       "Set to 0.05 on 2026-09-26 (log 0.5.37): backtest E[net] rises from "
+       "+0.0146% to +0.0654%/trade and PF 1.01 -> 1.06 while keeping 90% of "
+       "signals; live (N 68) PF 0.86 -> 1.55. The curve is flat 4-6% so 5% is "
+       "the middle of the plateau, not the in-sample peak.",
+       min=0.0, max=0.5, step="0.005"),
     _s("CSM_PROFIT_LADDER", "CSM", "choice", "on", "Profit ladder",
        "on = lock +0.15% at +1%, +1.5% at +2.5%, +2.5% at +4%. "
        "off = breakeven then 2xATR trail.", options=["on", "off"]),
