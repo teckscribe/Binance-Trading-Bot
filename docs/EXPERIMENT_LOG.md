@@ -630,6 +630,38 @@ Two changes were implemented behind settings and measured four ways on 84 symbol
 
 ---
 
+**0.5.38 FUNDING_SHORT does NOT transfer to Binance — measured, not ported (2026-09-28).** Operator asked to implement DCB's funding-crowding short on CSB. Two independent findings say no; nothing was wired to orders.
+
+**1. It cannot be sized on this account.** The rule's stops are huge — median 26 %, p75 40 %, p90 66 % of entry (DCB §1.42). At $57 equity against Binance's $5 minimum notional:
+
+| stop | notional @1 % risk | @2 % risk | forced to the $5 minimum |
+|---|---|---|---|
+| median 26 % | $2.19 | $4.38 | 2.3 % of equity |
+| p75 40 % | $1.43 | $2.85 | 3.5 % |
+| p90 66 % | $0.86 | $1.73 | **5.8 %** |
+
+Every correctly-sized order is below the exchange minimum; forcing the minimum breaches the 1–2 % per-trade risk rule in `AGENTS.md`. Equity needed: ~$130 at 1 % risk for a median-stop trade, ~$330 to cover p90.
+
+**2. The edge is negative on Binance.** `tools/funding_study_binance.py` — the rule frozen before results and identical to the Delta variant `thr0.10_SHORT_24h` (short the settled rate ≥ 0.10 %, 24 h hold, stop = entry + 1.5×ATR(14, closed 1h)×√24, gap-aware on 1h highs, 0.04 % fee + 0.03 % slip per side, signed funding over the hold, random same-moment twin per trade). 527 USDT perps, 365 days, 125 coins signalled, **2,651 signals → 1,208 simulable trades**:
+
+| | mean/trade | PF | months + |
+|---|---|---|---|
+| **the rule** | **−1.134 %** | **0.83** | 6/13 |
+| random twin shorts | −0.568 % | 0.74 | |
+| **edge over twins** | **−0.566 %** | | |
+
+It is not merely unprofitable, it is **worse than shorting a random coin at the same moments** — so the "the year paid shorts" defence does not apply; the selection itself is harmful on Binance.
+
+Decomposition: gross price move **−1.507 %**, funding received **+0.512 %**, costs −0.140 % → net −1.134 %. **The funding income is real and roughly as advertised; the adverse price move is three times larger.** Only 11 % of trades stop out, so this is not a stop-placement artefact — high-funding Binance coins keep rising.
+
+**3. Delta's five profit-carrying coins lose on Binance.** LAB, ARC, BEAT, AIO and PIPPIN carried 87 % of the Delta profit (§1.39) and all five list on Binance. Same rule, same year, Binance data: **n 102, mean −5.288 %/trade, PF 0.53** (LAB −20.1 %, BEAT −13.5 %, PIPPIN −5.7 %, AIO −1.5 %; only ARC positive at +4.7 %). The same coins, the same signal, the opposite outcome on the deeper venue. That is the strongest evidence yet that DCB's §1.39 result is **venue microstructure or noise, not a crowding premium** — and it should weigh on DCB's own forward test, which is ~1 day into a 100-signal pre-registration.
+
+**Not adopted, and no threshold hunt.** The 0.25–0.50 % bucket reads +0.968 %/trade (PF 1.10, n 77) and the ≥0.50 % bucket −14.8 % — picking the former after seeing this table is exactly the search that DCB's own walk-forward already failed twice. Recorded so it is not re-proposed as a finding.
+
+**Built and kept:** `tools/funding_study_binance.py` (re-runnable, rule in its docstring) and `data/funding_study_binance.json` (all 1,208 trades + twins). **Not built:** the strategy class, factory entry, regime permissions or signal logger — there is no reason to accrue a forward sample for a rule that is negative and below minimum size. Revisit only if the account reaches ~$300 *and* a fresh Binance measurement turns positive.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values
