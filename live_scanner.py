@@ -1288,7 +1288,7 @@ def _scan_for_signals(
 # has its own verdict — the 0.025 threshold was measured on CSM and does not
 # transfer. Module constants — changing them needs a restart; deliberately
 # not a hot setting so the gated set cannot be widened from a bot command.
-KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM")
+KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT")
 KRONOS_GATE_STRATEGIES   = ("CSM",)
 
 
@@ -1370,6 +1370,20 @@ def _execute_entries(
     for sig in signals:
         if entries >= MAX_ENTRIES_PER_CYCLE:
             break
+
+        # ── Paper-only strategies ─────────────────────────────────────────────
+        # A strategy class may set PAPER_ONLY = True. When the bot is LIVE its
+        # signals are logged and dropped here, before sizing or any exchange
+        # call. This is a class attribute rather than a setting so it cannot be
+        # toggled from Telegram/dashboard by accident. FUNDING_SHORT carries it:
+        # measured on Binance at PF 0.83 and worse than random shorts (0.5.38),
+        # and unsizable at this equity against the $5 minimum.
+        if LIVE_ENABLED:
+            _cls = StrategyFactory.get(sig.get("strategy", ""))
+            if _cls is not None and getattr(_cls, "PAPER_ONLY", False):
+                log.info(f"[PAPER_ONLY] {sig['strategy']} {sig['symbol']} "
+                         f"signal logged, not traded (bot is LIVE)")
+                continue
 
         # ── Loss cap gate (persistent) ────────────────────────────────────────
         cap_hit, cap_reason = is_loss_cap_hit()

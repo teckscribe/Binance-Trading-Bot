@@ -662,6 +662,32 @@ Decomposition: gross price move **−1.507 %**, funding received **+0.512 %**, c
 
 ---
 
+**0.5.39 Funding rule, 42-variant combination search on Binance — walk-forward FAIL; paper-only wiring shipped (2026-09-28).** Operator asked to run the strategy on paper and try other coins and combinations. Both done.
+
+**The search.** `tools/funding_grid_binance.py`: side (SHORT/LONG) x rate threshold (0.05/0.10/0.20/0.40 %) x hold (8/24/72 h) x coin filter (all / no-majors / majors-only) = 42 variants with >= 40 trades, 365 days, 527 perps, same costs and gap-aware stops as §0.5.38. Data cached to `data/funding_cache_binance.json` so further variants are instant.
+
+| | |
+|---|---|
+| best in-sample | **LONG, thr 0.40 %, 72 h, all coins — n 2,587, +1.227 %/trade, PF 1.13** |
+| **walk-forward OOS (pooled)** | **n 7,539, −0.508 %/trade, PF 0.92** |
+| verdict | **FAIL** |
+
+Walk-forward method: cut the year into 4 folds; before each fold pick the best variant on everything prior, then score only that fold. Fold results: LONG 0.05 % 72 h → −0.558 %; SHORT 0.20 % 8 h → +0.385 % (n 71); LONG 0.40 % 72 h → −0.057 %. The search picks a different "best" almost every fold, which is the signature of chasing noise.
+
+**"Different coins" does not help.** `no-majors` is identical to `all` to three decimals in every row (e.g. SHORT 0.10 % 24 h: −1.134 % vs −1.134 %). Majors almost never reach these funding levels, so the filter removes nothing. There is no coin subset to find.
+
+**The LONG 72 h cells are market beta, not an edge.** They read positive at *every* threshold (+0.85 / +0.83 / +0.99 / +1.23 %), and the lowest-threshold cell has **n 21,810** — i.e. nearly every coin at nearly every boundary. That is "buy anything and hold 72 h in a rising year", not a funding signal. The walk-forward duly gives it back (−0.558 % and −0.057 % on the folds where it was picked).
+
+**Recorded so it is not re-proposed:** SHORT 0.20 % 8 h shows +0.692 % in-sample (n 163) and won one fold at +0.385 % (n 71). Two positive readings out of 42 cells at n<200 is what chance produces; it is not a finding.
+
+**Shipped anyway, because paper costs nothing:** `modules/strategies/funding_short.py` on CSB, ported from DCB with a Binance rate source (`/fapi/v1/fundingRate`, the rate **settled** at T, so no look-ahead — Delta needed a FUNDING candle because its small coins settle every 4 h). Registered in the factory, permitted in all three regimes, leverage 1x, added to the Kronos shadow list, and every signal appends to `data/funding_short_signals.jsonl` before any cap check. Verified through the live path: settled rates read correctly (BTC 0.0020 %, LAB 0.0116 %, ARC 0.0155 % at the 00:00 UTC boundary) and `scan()` returns None outside the 30-min entry window.
+
+**New safety mechanism — `PAPER_ONLY`.** CSB runs `LIVE_ENABLED=true`, so a strategy in the factory places real orders. A class may now set `PAPER_ONLY = True`; `live_scanner._execute_entries` logs and drops those signals before sizing or any exchange call whenever the bot is live. It is a class attribute, not a setting, so Telegram/dashboard cannot flip it. Without it, adding FUNDING_SHORT here would have placed real 26–66 %-stop shorts on a $57 account.
+
+**Standing conclusion:** three independent measurements now say this rule does not work on Binance — the frozen Delta rule (§0.5.38, PF 0.83, worse than random twins), Delta's five profit coins traded here (PF 0.53), and a 42-variant search with walk-forward (OOS −0.508 %). It runs on paper for observation only. Live would additionally require ~$300 equity for the stops to be sizable at 1–2 % risk.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

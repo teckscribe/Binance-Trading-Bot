@@ -215,6 +215,7 @@ STRATEGY_LEVERAGE = {
     "CSM":   3,
     "NASOS_V4":   3,
     "TSMOM_4H":   3,
+    "FUNDING_SHORT": 1,
     "REBALANCING_PREMIUM": 3,
     # ── Archived (retained so historical positions still size correctly) ─────
     "SMA_OFFSET": 3,

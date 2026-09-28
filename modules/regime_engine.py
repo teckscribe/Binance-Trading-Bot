@@ -512,15 +512,17 @@ REGIME_STRATEGY_PERMISSIONS = {
     #
     # All figures are in-sample on one 90d window and one scan-phase alignment;
     # the 17.32 rule (>= 5 offsets) has NOT been run on these cuts.
-    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True,  "REBALANCING_PREMIUM": False},
-    "BEAR_TREND":  {"CSM": False, "NASOS_V4": False, "TSMOM_4H": True,  "REBALANCING_PREMIUM": True},
-    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False},
+    # FUNDING_SHORT is PAPER_ONLY (0.5.38) - permitted everywhere the study
+    # looked, which was every regime; it can never reach a live order.
+    "BULL_TREND":  {"CSM": False, "NASOS_V4": True,  "TSMOM_4H": True,  "REBALANCING_PREMIUM": False, "FUNDING_SHORT": True},
+    "BEAR_TREND":  {"CSM": False, "NASOS_V4": False, "TSMOM_4H": True,  "REBALANCING_PREMIUM": True,  "FUNDING_SHORT": True},
+    "RANGING":     {"CSM": True,  "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False, "FUNDING_SHORT": True},
     # CSM OVERSOLD True -> False (2026-08-29, Config A). The sweep measured CSM
     # only in RANGING; OVERSOLD was never part of the 78.4% result and is rare
     # enough in the 90d window that it carries no measurement at all. Leaving it
     # True would let CSM trade an unmeasured regime under a config tuned for a
     # different one. Re-enable only with numbers behind it.
-    "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False},
+    "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False, "FUNDING_SHORT": False},
     "OVERHEATED":  {},
 }
 

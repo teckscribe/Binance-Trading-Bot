@@ -58,11 +58,11 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM"]
+    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT"]
 
 
 PROD_STRATS = _production_strats()
-STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "TSMOM_4H": "🔵", "REBALANCING_PREMIUM": "🟣"}
+STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "TSMOM_4H": "🔵", "REBALANCING_PREMIUM": "🟣", "FUNDING_SHORT": "🟤"}
 SERVICE   = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))

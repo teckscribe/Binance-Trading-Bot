@@ -39,7 +39,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM"]
+    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT"]
 
 
 STRATEGIES = _production_strategy_ids()
