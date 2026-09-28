@@ -1591,7 +1591,19 @@ def main() -> None:
         log.info(f"  Max symbols   : {TOP_N_SYMBOLS}")
     log.info(f"  Max concurrent: {MAX_CONCURRENT} positions")
     from modules.risk_engine import max_per_strategy
-    log.info(f"  Per-strategy caps: {max_per_strategy()}")
+    _caps = max_per_strategy()
+    log.info(f"  Per-strategy caps: {_caps}")
+    # A strategy absent from MAX_PER_STRATEGY is UNCAPPED, not disabled:
+    # is_strategy_cap_hit() returns False on a missing key, so it can take
+    # every free slot up to MAX_CONCURRENT. Easy to hit when a strategy is
+    # added to the factory and the caps string is not updated (FUNDING_SHORT,
+    # 2026-09-28). Warn rather than guess a default, since 0 would silently
+    # disable and a positive number would silently enable.
+    _uncapped = [s.STRATEGY_ID for s in StrategyFactory.get_all()
+                 if s.STRATEGY_ID not in _caps]
+    if _uncapped:
+        log.warning(f"  ⚠  UNCAPPED (no MAX_PER_STRATEGY entry, may take every "
+                    f"free slot): {', '.join(_uncapped)}")
     log.info(f"  Settings file : {cfg.SETTINGS_FILE} (hot-reloaded)")
     log.info("=" * 60)
 

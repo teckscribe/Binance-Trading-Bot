@@ -688,6 +688,25 @@ Walk-forward method: cut the year into 4 folds; before each fold pick the best v
 
 ---
 
+**0.5.40 A strategy missing from `MAX_PER_STRATEGY` is UNCAPPED, not disabled (2026-09-28).** Operator noticed FUNDING_SHORT was absent from the per-strategy settings. Cross-checked all four surfaces:
+
+| surface | state | why |
+|---|---|---|
+| Telegram / Discord strategy menus | **fine after a pull** | `PROD_STRATS` / `_known_strategy_ids()` both enumerate `StrategyFactory.get_all()`, so a new strategy appears automatically. The box was still on the old code. |
+| Telegram / Discord caps validator | **fine after a pull** | validates against the factory list, so it accepts `FUNDING_SHORT:1` |
+| dashboard `_STRATEGY_META` | needs a row | cosmetic only — the list itself is factory-derived |
+| **`MAX_PER_STRATEGY`** | **bug** | see below |
+
+**The bug.** `risk_engine.is_strategy_cap_hit()` returns `False` when the strategy has no key in `MAX_PER_STRATEGY` — so **missing means unlimited, not zero.** An added strategy with no caps entry can take every free slot up to `MAX_CONCURRENT`. Verified: with 9 FUNDING_SHORT positions already open and no cap key, `is_strategy_cap_hit()` still returns False.
+
+No impact on CSB today — FUNDING_SHORT is `PAPER_ONLY` and the bot is LIVE, so its signals are dropped before sizing. **It would bite the moment `LIVE_ENABLED=false`**, which is exactly the paper run the operator asked for: FUNDING_SHORT would be uncapped while the other four sit at 1 slot each, and could hold all 4 concurrent slots.
+
+**Fixed two ways.** (1) Code default is now `CSM:3,NASOS_V4:3,TSMOM_4H:1,REBALANCING_PREMIUM:1,FUNDING_SHORT:1`, with the missing-key behaviour spelled out in the setting's help text. (2) The scanner now logs at startup: `⚠ UNCAPPED (no MAX_PER_STRATEGY entry, may take every free slot): …` for any loaded strategy without an entry. A warning rather than a default, because 0 would silently disable a strategy someone expected to run and a positive number would silently enable one.
+
+`data/settings.json` is git-ignored, so the box needs the caps string set by hand — the code default only applies where the file has no value.
+
+---
+
 ## 1. CURRENT STATE
 
 *Last updated: 2026-09-14. Sections below this point may use earlier parameter values

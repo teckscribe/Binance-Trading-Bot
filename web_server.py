@@ -104,6 +104,7 @@ _STRATEGY_META = {
     "NASOS_V4":   ("NASOS V4 Dip-Buy",         "Freqtrade", "EWO + RSI dip-buy on 5m",          "#EAB308"),
     "TSMOM_4H":   ("TSMOM 4H Trend",           "Quant",     "72h momentum >= 5%, 24h hold (long)", "#3B82F6"),
     "REBALANCING_PREMIUM": ("Rebalancing Premium", "Quant", "daily 00:00 UTC majors basket, 24h hold (long)", "#A855F7"),
+    "FUNDING_SHORT": ("Funding Crowding Short", "Quant", "short funding >= 0.10% at 00/08/16 UTC, 24h hold — PAPER ONLY", "#A16207"),
 }
 
 

@@ -102,8 +102,13 @@ SPEC = [
     # ── Risk & sizing ────────────────────────────────────────────────────────
     _s("MAX_CONCURRENT", "Risk", "int", 3, "Max concurrent positions",
        "Total open positions across all strategies.", min=1, max=20),
-    _s("MAX_PER_STRATEGY", "Risk", "csv_caps", "CSM:3,NASOS_V4:3,TSMOM_4H:1,REBALANCING_PREMIUM:1",
-       "Per-strategy caps", "Format: CSM:2,NASOS_V4:2,TSMOM_4H:1,REBALANCING_PREMIUM:1"),
+    _s("MAX_PER_STRATEGY", "Risk", "csv_caps",
+       "CSM:3,NASOS_V4:3,TSMOM_4H:1,REBALANCING_PREMIUM:1,FUNDING_SHORT:1",
+       "Per-strategy caps",
+       "Format: CSM:2,NASOS_V4:2,TSMOM_4H:1,FUNDING_SHORT:1. A strategy MISSING "
+       "from this string is UNCAPPED, not disabled - it may take every free "
+       "slot (risk_engine.is_strategy_cap_hit returns False on a missing key). "
+       "The scanner warns at startup for any loaded strategy with no entry."),
     _s("MAX_TOTAL_MARGIN_PCT", "Risk", "float", 0.60, "Max total margin (fraction)",
        "Ceiling on combined margin as a fraction of equity.",
        min=0.05, max=1.0, step="0.01"),
