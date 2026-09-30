@@ -1734,7 +1734,6 @@ def main() -> None:
     _regime_changed_at = datetime.now(timezone.utc)
 
     # Show permitted strategies in startup message
-    from modules.strategies.strategy_factory import StrategyFactory
     permitted = StrategyFactory.get_permitted(regime, REGIME_STRATEGY_PERMISSIONS)
     permitted_ids = [s.STRATEGY_ID for s in permitted]
     notify_startup(regime, len(symbols), len(symbols[:TOP_N_SYMBOLS]), permitted_ids)
