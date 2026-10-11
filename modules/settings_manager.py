@@ -70,6 +70,10 @@ def _s(key, group, type_, default, label, help_="", hot=True, **kw):
 
 
 SPEC = [
+    _s("EMA100_TREND_ENABLED", "Strategies", "bool", False,
+       "EMA100 daily trend", "Daily EMA100 flip with a 3 ATR trailing stop; PAPER validation first."),
+    _s("DONCHIAN_55_20_ENABLED", "Strategies", "bool", False,
+       "Donchian 55/20 breakout", "Daily close-confirmed 55/20 breakout with a 3 ATR trailing stop; PAPER validation first."),
     # ── Account ──────────────────────────────────────────────────────────────
     _s("ACCOUNT_EQUITY_USDT", "Account", "float", 10.0, "Account equity (USDT)",
        "Base for position sizing. Risk per trade is 1% of this. In PAPER mode "
@@ -103,9 +107,9 @@ SPEC = [
     _s("MAX_CONCURRENT", "Risk", "int", 3, "Max concurrent positions",
        "Total open positions across all strategies.", min=1, max=20),
     _s("MAX_PER_STRATEGY", "Risk", "csv_caps",
-       "CSM:3,NASOS_V4:3,TSMOM_4H:1,REBALANCING_PREMIUM:1,FUNDING_SHORT:1",
+       "CSM:3,EMA100_TREND:1,DONCHIAN_55_20:1",
        "Per-strategy caps",
-       "Format: CSM:2,NASOS_V4:2,TSMOM_4H:1,FUNDING_SHORT:1. A strategy MISSING "
+       "Format: CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1. A strategy MISSING "
        "from this string is UNCAPPED, not disabled - it may take every free "
        "slot (risk_engine.is_strategy_cap_hit returns False on a missing key). "
        "The scanner warns at startup for any loaded strategy with no entry."),

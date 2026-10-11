@@ -503,7 +503,7 @@ _ENTRY_SETTINGS_KEYS = (
     "MAX_PER_STRATEGY", "KRONOS_GATE", "KRONOS_PF_THR",
     "CSM_MOM_LO", "CSM_MOM_HI", "CSM_SL_ATR_LONG", "CSM_SL_ATR_SHORT",
     "CSM_TP_ATR_LONG", "CSM_TP_ATR_SHORT", "CSM_PROFIT_LADDER", "CSM_MAX_HOLD_MIN",
-    "NASOS_SL_MODE", "NASOS_SL_FLAT", "NASOS_TP_ATR",
+    "EMA100_TREND_ENABLED", "DONCHIAN_55_20_ENABLED",
 )
 
 
@@ -1288,7 +1288,7 @@ def _scan_for_signals(
 # has its own verdict — the 0.025 threshold was measured on CSM and does not
 # transfer. Module constants — changing them needs a restart; deliberately
 # not a hot setting so the gated set cannot be widened from a bot command.
-KRONOS_SHADOW_STRATEGIES = ("CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT")
+KRONOS_SHADOW_STRATEGIES = ("CSM",)
 KRONOS_GATE_STRATEGIES   = ("CSM",)
 
 

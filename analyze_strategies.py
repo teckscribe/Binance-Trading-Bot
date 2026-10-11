@@ -39,7 +39,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT"]
+    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
 
 
 STRATEGIES = _production_strategy_ids()
@@ -180,9 +180,8 @@ def print_report(all_trades: dict[str, list[dict]], mode: str) -> None:
     strat_meta = {
         # Production
         "CSM":        "🟢 Cross-Sectional Momentum",
-        "NASOS_V4":   "🟡 NASOS V4 Dip-Buy",
-        "TSMOM_4H":   "🔵 TSMOM 4H Trend",
-        "REBALANCING_PREMIUM": "🟣 Rebalancing Premium",
+        "EMA100_TREND": "🟩 EMA100 Daily Trend",
+        "DONCHIAN_55_20": "🟦 Donchian 55/20 Breakout",
         # Archived (labels kept so old logs still render nicely)
         "SMA_OFFSET": "⚪ SMA Offset Dip-Buy (archived)",
         "LIQ":   "⚪ Liquidation Cascades (archived)",

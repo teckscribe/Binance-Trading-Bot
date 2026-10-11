@@ -35,9 +35,8 @@ _COLOR_GREY   = 0x95A5A6
 
 _STRATEGY_META = {
     "CSM":        {"emoji": "🟢", "label": "Cross-Sectional Momentum"},
-    "NASOS_V4":   {"emoji": "🟡", "label": "NASOS V4 Dip-Buy"},
-    "TSMOM_4H":   {"emoji": "🔵", "label": "TSMOM 4H Trend"},
-    "REBALANCING_PREMIUM": {"emoji": "🟣", "label": "Rebalancing Premium"},
+    "EMA100_TREND": {"emoji": "🟩", "label": "EMA100 Daily Trend"},
+    "DONCHIAN_55_20": {"emoji": "🟦", "label": "Donchian 55/20 Breakout"},
 }
 
 _REGIME_EMOJI = {

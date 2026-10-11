@@ -83,9 +83,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from modules.strategies.cross_sectional_momentum  import CrossSectionalMomentum
-from modules.strategies.freqtrade_port_nasos       import NASOSv4Port
-from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
-from modules.strategies.rebalancing_premium        import RebalancingPremiumStrategy
+from modules.strategies.ema100_trend              import EMA100Trend
+from modules.strategies.donchian_55_20            import Donchian5520
 
 from modules.risk_engine import (
     MAX_MARGIN_PCT, max_concurrent, daily_loss_cap, weekly_loss_cap,
@@ -157,11 +156,22 @@ FORMING_1H      = os.getenv("BT_FORMING_1H", "false").lower() == "true"
 # longer be backtested even with --strategies. See strategy_factory.py.
 STRATEGY_CLASSES = {
     "CSM":   CrossSectionalMomentum,
-    "NASOS_V4":   NASOSv4Port,
-    # DCB's two 2026-09-20 additions, ported for a Binance cross-check only.
-    "TSMOM_4H": TSMOM4HStrategy,
-    "REBALANCING_PREMIUM": RebalancingPremiumStrategy,
+    "EMA100_TREND": EMA100Trend,
+    "DONCHIAN_55_20": Donchian5520,
 }
+
+def _load_optional_strategy(sid):
+    """Load retired/research strategies only when explicitly requested."""
+    if sid == "NASOS_V4":
+        from modules.strategies.freqtrade_port_nasos import NASOSv4Port
+        return NASOSv4Port
+    if sid == "TSMOM_4H":
+        from modules.strategies.tsmom_4h import TSMOM4HStrategy
+        return TSMOM4HStrategy
+    if sid == "REBALANCING_PREMIUM":
+        from modules.strategies.rebalancing_premium import RebalancingPremiumStrategy
+        return RebalancingPremiumStrategy
+    return None
 
 # Default to whatever the factory actually runs, so a backtest reflects
 # production unless you deliberately ask for more via --strategies.
@@ -184,11 +194,13 @@ STRATEGY_ORDER = PRODUCTION_IDS + [
 ]
 TIER = {"CSM": "Elite",
         "NASOS_V4": "FT",
-        "TSMOM_4H": "Quant", "REBALANCING_PREMIUM": "Quant"}
+        "TSMOM_4H": "Quant", "REBALANCING_PREMIUM": "Quant",
+        "EMA100_TREND": "Daily", "DONCHIAN_55_20": "Daily"}
 
 MOCK_REGIME = {"CSM": "BULL_TREND",
                "NASOS_V4": "BULL_TREND",
                "TSMOM_4H": "BULL_TREND", "REBALANCING_PREMIUM": "RANGING"}
+MOCK_REGIME.update({"EMA100_TREND": "BULL_TREND", "DONCHIAN_55_20": "BULL_TREND"})
 
 # Tokenised equities and leveraged ETFs on Binance USDM Futures. These only
 # move during US cash-session hours and have no perpetual funding dynamics,
@@ -744,6 +756,11 @@ def run_backtest_1m(strategy_class, symbol, regime_series=None,
         else:
             regime = dict(regime_at(regime_series, now + pd.Timedelta(minutes=1)))
 
+        # Daily-trend strategies need the completed hourly context during both
+        # entry and management. Keep this hook optional for older strategies.
+        if hasattr(strategy, "set_backtest_context"):
+            strategy.set_backtest_context(symbol, cur_1h, bar_close)
+
         # ── Manage an open position ─────────────────────────────────────────
         if active:
             # Scan EVERY 1m bar since the previous step, not just the last one.
@@ -838,6 +855,12 @@ def run_backtest(strategy_class, symbol, regime_series=None,
     """
     df_15m = load_data(symbol, "15m", days)
     df_1h  = load_data(symbol, "1h",  days)
+    # The cached research set has 90d of 1h data but only 40d of 15m data.
+    # Daily strategies can still be evaluated causally on the hourly fallback;
+    # the report then reflects hourly stop sampling rather than pretending it
+    # had unavailable 15m precision.
+    if df_15m is None and df_1h is not None:
+        df_15m = df_1h.copy()
     if df_15m is None or df_1h is None or len(df_15m) < WARMUP_BARS + 10:
         return []
 
@@ -868,6 +891,13 @@ def run_backtest(strategy_class, symbol, regime_series=None,
         else:
             cur_1h = _hourly_as_of(_df_1h_o, _h_ts, _h_np, _partial, i, bar_close)
 
+        # _hourly_as_of intentionally builds a compact partial frame for the
+        # momentum strategies. Daily strategies need the real DatetimeIndex to
+        # resample completed hours into UTC days, so give them the exact
+        # closed-hour slice instead.
+        if hasattr(strategy_class, "set_backtest_context"):
+            cur_1h = df_1h[df_1h.index + _ONE_HOUR <= bar_close]
+
         if mock_regime_name:
             regime = {"regime": mock_regime_name, "funding": 0.0}
         else:
@@ -877,6 +907,9 @@ def run_backtest(strategy_class, symbol, regime_series=None,
         if df_sec is not None:
             regime["secondary_15m"]     = df_sec[df_sec.index <= now]
             regime["secondary_symbol"]  = secondary
+
+        if hasattr(strategy, "set_backtest_context"):
+            strategy.set_backtest_context(symbol, cur_1h, now)
 
         # ── Manage an open position ──────────────────────────────────────────
         if active:
@@ -1487,6 +1520,11 @@ def main():
     # Default to the production set, not every strategy that has a class.
     strategies = [s.strip().upper() for s in args.strategies.split(",")] \
         if args.strategies else list(PRODUCTION_IDS)
+    for sid in strategies:
+        if sid not in STRATEGY_CLASSES:
+            cls = _load_optional_strategy(sid)
+            if cls is not None:
+                STRATEGY_CLASSES[sid] = cls
     unknown = [s for s in strategies if s not in STRATEGY_CLASSES]
     if unknown:
         sys.exit(f"Unknown strategy IDs: {unknown}. Valid: {list(STRATEGY_CLASSES)}")

@@ -60,11 +60,11 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT"]
+    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
 
 
 PROD_STRATS = _production_strats()
-STRAT_EMOJI = {"CSM": "🟢", "NASOS_V4": "🟡", "TSMOM_4H": "🔵", "REBALANCING_PREMIUM": "🟣", "FUNDING_SHORT": "🟤"}
+STRAT_EMOJI = {"CSM": "🟢", "EMA100_TREND": "🟩", "DONCHIAN_55_20": "🟦"}
 SERVICE    = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -167,7 +167,7 @@ def _known_strategy_ids() -> list:
 
 def validate_max_per_strategy(text: str):
     """
-    Validate "CSM:1,NASOS_V4:2" -> (ok, normalised, message).
+    Validate "CSM:1,EMA100_TREND:1" -> (ok, normalised, message).
 
     The message carries WARNINGS even when ok is True: a cap above
     MAX_CONCURRENT is inert, a total below it leaves slots that can never fill,
@@ -180,7 +180,7 @@ def validate_max_per_strategy(text: str):
         if not chunk:
             continue
         if ":" not in chunk:
-            return False, "", f"`{chunk}` is not STRATEGY:NUMBER. Example: `CSM:1,NASOS_V4:2`"
+            return False, "", f"`{chunk}` is not STRATEGY:NUMBER. Example: `CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`"
         sid, _, raw = chunk.partition(":")
         sid = sid.upper()
         if known and sid not in known:
@@ -197,7 +197,7 @@ def validate_max_per_strategy(text: str):
         pairs.append((sid, n))
 
     if not pairs:
-        return False, "", "Nothing to set. Example: `CSM:1,NASOS_V4:2`"
+        return False, "", "Nothing to set. Example: `CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`"
 
     value = ",".join(f"{s}:{n}" for s, n in pairs)
     warn = []
@@ -944,7 +944,7 @@ class TradeControlsView(discord.ui.View):
             f"How many of the concurrent slots each strategy may hold. Stops one "
             f"strategy taking every slot.\n\n"
             f"Loaded: **{', '.join(known) if known else 'unavailable'}**\n\n"
-            f"Change with `/max_per_strategy CSM:1,NASOS_V4:2`\n"
+            f"Change with `/max_per_strategy CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`\n"
             f"*A strategy left out is UNCAPPED. Requires a scanner RESTART.*",
             view=TradeControlsView())
 
@@ -1456,7 +1456,7 @@ async def cmd_max_concurrent(interaction: discord.Interaction, count: int = None
 
 
 @tree.command(name="max_per_strategy", description="View or change per-strategy slot caps", guild=GUILD_OBJ)
-@app_commands.describe(caps="e.g. CSM:1,NASOS_V4:2 (omit to view current)")
+@app_commands.describe(caps="e.g. CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1 (omit to view current)")
 async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = None):
     if not _allowed(interaction):
         return await _deny(interaction)
@@ -1468,7 +1468,7 @@ async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = Non
             f"📐 **Per-Strategy Caps:** `{_max_per_strategy_status()}`\n"
             f"Max concurrent: **{_max_concurrent_status()}**\n"
             f"Loaded: {', '.join(known) if known else 'unavailable'}\n\n"
-            f"Use `/max_per_strategy CSM:1,NASOS_V4:2` to change.\n"
+            f"Use `/max_per_strategy CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1` to change.\n"
             f"*A strategy left out is UNCAPPED.*")
         return
 

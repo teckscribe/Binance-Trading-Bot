@@ -1,6 +1,15 @@
 # ⚡ Binance Futures AI Trading Terminal — System Brief (CSB)
 
-*Last updated: 2026-09-24 — four strategies, one regime each; all backtest evidence re-measured after two harness defects were fixed (EXPERIMENT_LOG §0.5.29–§0.5.32)*
+*Last updated: 2026-10-11 — production factory reduced to CSM plus two disabled daily PAPER candidates.*
+
+**Production-set update:** the runnable factory now contains only `CSM`,
+`EMA100_TREND`, and `DONCHIAN_55_20`. NASOS_V4, TSMOM_4H,
+REBALANCING_PREMIUM, and FUNDING_SHORT are removed from production wiring and
+operator surfaces; their source/backtest artifacts remain only for historical
+research compatibility. The two daily strategies use completed UTC daily
+candles, a five-minute post-midnight entry window, and a three-ATR trailing
+stop. They are disabled by default and require PAPER validation before any
+promotion.
 
 ---
 

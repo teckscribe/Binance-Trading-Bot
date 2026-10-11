@@ -213,10 +213,8 @@ HARD_STOP_PCT       = 0.025      # 2.5% — upper bound for ML P3 SL override
 STRATEGY_LEVERAGE = {
     # ── Production ───────────────────────────────────────────────────────────
     "CSM":   3,
-    "NASOS_V4":   3,
-    "TSMOM_4H":   3,
-    "FUNDING_SHORT": 1,
-    "REBALANCING_PREMIUM": 3,
+    "EMA100_TREND": 1,
+    "DONCHIAN_55_20": 1,
     # ── Archived (retained so historical positions still size correctly) ─────
     "SMA_OFFSET": 3,
     "LIQ":  3,

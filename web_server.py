@@ -101,10 +101,8 @@ async def get_status():
 # what actually trades (the dashboard previously showed only 4 of 7).
 _STRATEGY_META = {
     "CSM":        ("Cross-Sectional Momentum",  "Elite",     "24h 4-5x ATR breakout (long + short)",  "#34D399"),
-    "NASOS_V4":   ("NASOS V4 Dip-Buy",         "Freqtrade", "EWO + RSI dip-buy on 5m",          "#EAB308"),
-    "TSMOM_4H":   ("TSMOM 4H Trend",           "Quant",     "72h momentum >= 5%, 24h hold (long)", "#3B82F6"),
-    "REBALANCING_PREMIUM": ("Rebalancing Premium", "Quant", "daily 00:00 UTC majors basket, 24h hold (long)", "#A855F7"),
-    "FUNDING_SHORT": ("Funding Crowding Short", "Quant", "short funding >= 0.10% at 00/08/16 UTC, 24h hold — PAPER ONLY", "#A16207"),
+    "EMA100_TREND": ("EMA100 Daily Trend", "Research", "daily EMA100 flip, 3 ATR trail; PAPER first", "#22B8A0"),
+    "DONCHIAN_55_20": ("Donchian 55/20 Breakout", "Research", "daily close-confirmed breakout, 3 ATR trail; PAPER first", "#60A5FA"),
 }
 
 

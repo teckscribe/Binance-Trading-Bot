@@ -4,7 +4,8 @@ Instantiate and return the production strategy objects.
 
 Production set (2), listed in scan-priority order:
     CSM        - Cross-Sectional Momentum  (4-5x ATR(1h) 24h move, long + short)
-    NASOS_V4   - NASOS V4 Dip-Buy         (EWO + RSI dip-buy on 5m)
+    EMA100_TREND    - Daily EMA100 trend flip
+    DONCHIAN_55_20  - Daily close-confirmed breakout
 
 DELETED 2026-08-20: SMA_OFFSET.
   Negative in every configuration on the corrected harness with 0.03%/side
@@ -26,17 +27,13 @@ DELETED 2026-09-14: TP (trend_pullback), FF_V2 (funding_fade_v2), GRID,
 
 from modules.strategies.base_strategy               import BaseStrategy
 from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
-from modules.strategies.freqtrade_port_nasos        import NASOSv4Port
-from modules.strategies.funding_short             import FundingShortStrategy
-from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
-from modules.strategies.rebalancing_premium        import RebalancingPremiumStrategy
+from modules.strategies.ema100_trend              import EMA100Trend
+from modules.strategies.donchian_55_20            import Donchian5520
 
 _ALL_STRATEGIES = [
     CrossSectionalMomentum(),
-    NASOSv4Port(),
-    TSMOM4HStrategy(),
-    RebalancingPremiumStrategy(),
-    FundingShortStrategy(),
+    EMA100Trend(),
+    Donchian5520(),
 ]
 
 _STRATEGY_MAP = {s.STRATEGY_ID: s for s in _ALL_STRATEGIES}

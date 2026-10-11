@@ -42,7 +42,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4", "TSMOM_4H", "REBALANCING_PREMIUM", "FUNDING_SHORT"]
+    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
 
 
 KNOWN_STRATEGIES = _production_strategy_ids()

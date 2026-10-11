@@ -482,6 +482,17 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
+    # Production set: CSM plus the two new daily candidates. The daily rules
+    # remain opt-in and disabled by default; regime-neutral routing keeps the
+    # initial PAPER observation comparable across the three market states.
+    "BULL_TREND":  {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
+    "BEAR_TREND":  {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
+    "RANGING":     {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
+    "OVERSOLD":    {"CSM": False, "EMA100_TREND": False, "DONCHIAN_55_20": False},
+    "OVERHEATED":  {"CSM": False, "EMA100_TREND": False, "DONCHIAN_55_20": False},
+}
+
+''' Historical pre-daily-strategy matrix retained below as documentation only.
     # ONE REGIME PER STRATEGY - operator decision 2026-09-24 (log 0.5.32).
     # Each strategy is permitted only where it measured best, from the 90d
     # forming-bar runs with real regime classification (0.5.29 - 0.5.31):
@@ -525,6 +536,7 @@ REGIME_STRATEGY_PERMISSIONS = {
     "OVERSOLD":    {"CSM": False, "NASOS_V4": False, "TSMOM_4H": False, "REBALANCING_PREMIUM": False, "FUNDING_SHORT": False},
     "OVERHEATED":  {},
 }
+'''
 
 
 def is_strategy_permitted(regime, strategy_id):
