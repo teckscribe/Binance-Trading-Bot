@@ -55,7 +55,10 @@ class EMA100Trend(BaseStrategy):
     REQUIRES_1H = True
     # Daily strategies run on the core 15m replay; 1m is unnecessary for
     # their entry or stop-management rules.
-    REQUIRES_1M_DEPTH = 0
+    # scan() still uses the latest 1m bar for the live entry price and
+    # freshness check. Zero makes data_hub request Binance limit=0 when CSM
+    # is disabled and these daily strategies are the only permitted sources.
+    REQUIRES_1M_DEPTH = 200
 
     def __init__(self):
         self._backtest_daily = {}
