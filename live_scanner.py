@@ -95,6 +95,7 @@ from live_logger               import LiveLogger, utc_to_ist
 from telegram_notifier         import (
     notify_startup  as _tg_notify_startup,
     notify_signal   as _tg_notify_signal,
+    notify_scan_summary as _tg_notify_scan_summary,
     notify_exit     as _tg_notify_exit,
     notify_session_summary as _tg_notify_session_summary,
     notify_error    as _tg_notify_error,
@@ -104,6 +105,7 @@ from telegram_notifier         import (
 from discord_notifier          import (
     notify_startup  as _dc_notify_startup,
     notify_signal   as _dc_notify_signal,
+    notify_scan_summary as _dc_notify_scan_summary,
     notify_exit     as _dc_notify_exit,
     notify_session_summary as _dc_notify_session_summary,
     notify_error    as _dc_notify_error,
@@ -131,6 +133,11 @@ def notify_signal(*a, **kw):
     _tg(_tg_notify_signal, *a, **kw)
     try: _dc_notify_signal(*a, **kw)
     except Exception as exc: log.warning(f"Discord notify_signal failed: {exc}")
+
+def notify_scan_summary(*a, **kw):
+    _tg(_tg_notify_scan_summary, *a, **kw)
+    try: _dc_notify_scan_summary(*a, **kw)
+    except Exception as exc: log.warning(f"Discord scan summary failed: {exc}")
 
 def notify_exit(*a, **kw):
     _tg(_tg_notify_exit, *a, **kw)
@@ -321,6 +328,11 @@ _symbol_loss_cooldown: dict[str, datetime] = {}
 # Loss-cap notification dedup — tracks which cap reasons we already alerted.
 # Cleared when the cap resets (new UTC day / week).
 _loss_cap_notified: set[str] = set()
+
+# Scan-summary notification dedup. Daily strategies can return the same signal
+# on every pass of their five-minute entry window; notify once per unique batch
+# instead of sending the same rejection message every minute.
+_scan_notice_keys: set[tuple] = set()
 
 # Persistent cooldown file — survives restarts
 _COOLDOWN_FILE = os.path.join(
@@ -1353,6 +1365,7 @@ def _execute_entries(
     logger:      LiveLogger,
     regime:      dict,
     symbol_data: dict | None = None,
+    report:      dict | None = None,
 ) -> int:
     """
     Open live positions for top signals. Returns count of entries made.
@@ -1361,6 +1374,14 @@ def _execute_entries(
     """
     entries = 0
     _kronos_waited_out: dict = {}    # one scoring timeout per cycle, see _kronos_gate
+
+    def reject(sig, reason):
+        if report is not None:
+            report.setdefault("rejected", []).append({
+                "strategy": sig.get("strategy", "?"),
+                "symbol": sig.get("symbol", "?"),
+                "reason": str(reason),
+            })
 
     # Regime age (for ML features)
     regime_age_min = (
@@ -1383,12 +1404,14 @@ def _execute_entries(
             if _cls is not None and getattr(_cls, "PAPER_ONLY", False):
                 log.info(f"[PAPER_ONLY] {sig['strategy']} {sig['symbol']} "
                          f"signal logged, not traded (bot is LIVE)")
+                reject(sig, "paper-only strategy while LIVE")
                 continue
 
         # ── Loss cap gate (persistent) ────────────────────────────────────────
         cap_hit, cap_reason = is_loss_cap_hit()
         if cap_hit:
             log.warning(f"Loss cap active — no new entries: {cap_reason}")
+            reject(sig, f"loss cap: {cap_reason}")
             break
 
         # ── Session floor gate ────────────────────────────────────────────────
@@ -1397,26 +1420,31 @@ def _execute_entries(
                 f"Session floor hit ({live.session_pnl_pct*100:.2f}%) "
                 f"— no new entries"
             )
+            reject(sig, "session loss floor")
             break
 
         # ── Concurrent position cap ───────────────────────────────────────────
         n_open = live.n_open()
         if is_position_cap_hit(n_open):
             log.info(f"Position cap hit ({n_open}/{MAX_CONCURRENT}) — skipping")
+            reject(sig, "maximum concurrent positions")
             break
 
         # ── Per-strategy slot limit ──────────────────────────────────────────
         strat_id = sig.get("strategy", "")
         if is_strategy_cap_hit(strat_id, live.active):
             log.info(f"[{sig['symbol']}] {strat_id} strategy cap reached — skipping")
+            reject(sig, "per-strategy position cap")
             continue
 
         # ── Skip if symbol already open ───────────────────────────────────────
         if live.is_symbol_active(sig["symbol"]):
+            reject(sig, "symbol already has an open position")
             continue
 
         # ── Kronos gate (CSM only; see _kronos_gate) ─────────────────────────
         if not _kronos_gate(sig, _kronos_waited_out):
+            reject(sig, "Kronos gate")
             continue
 
         # ── LLM Advisor Veto — DISABLED ──────────────────────────────────────
@@ -1449,6 +1477,7 @@ def _execute_entries(
                 f"[ML] Signal gated: {sig['symbol']} {sig['strategy']} "
                 f"P(win)={ml_adj.get('win_prob', -1):.3f}"
             )
+            reject(sig, f"ML gate: P(win)={ml_adj.get('win_prob', -1):.3f}")
             continue
 
         risk_mult = ml_adj.get("risk_mult", 1.0)
@@ -1496,6 +1525,7 @@ def _execute_entries(
         )
         if not size["valid"]:
             log.warning(f"Size invalid [{sig['symbol']}]: {size['reason']}")
+            reject(sig, size.get("reason", "invalid position size"))
             continue
         size["account_equity"] = ACCOUNT_EQUITY
 
@@ -1515,6 +1545,7 @@ def _execute_entries(
                 f"${_ceiling:.2f} ({MAX_TOTAL_MARGIN_PCT*100:.0f}% total cap) "
                 f"— skipping"
             )
+            reject(sig, "total margin cap")
             continue
 
         direction = sig["direction"]
@@ -1562,6 +1593,9 @@ def _execute_entries(
                 f"@ {sig['entry_price']} | {sig.get('reason','')}"
             )
             entries += 1
+
+        else:
+            reject(sig, "order engine did not open position")
 
     return entries
 
@@ -2061,10 +2095,29 @@ def main() -> None:
                                 f"Scan: {len(signals)} signal(s) | "
                                 f"Regime: {current_regime}"
                             )
+                            _entry_report = {}
                             n_entered = _execute_entries(
                                 signals, live, logger, regime,
                                 symbol_data=symbol_data,
+                                report=_entry_report,
                             )
+                            _notice_key = (
+                                datetime.now(timezone.utc).date().isoformat(),
+                                tuple(sorted(
+                                    (s.get("strategy"), s.get("symbol"), s.get("direction"))
+                                    for s in signals
+                                )),
+                                n_entered,
+                            )
+                            if _notice_key not in _scan_notice_keys:
+                                _scan_notice_keys.add(_notice_key)
+                                notify_scan_summary(
+                                    regime=regime,
+                                    signals=signals,
+                                    entered=n_entered,
+                                    rejected=_entry_report.get("rejected", []),
+                                    scan_symbols=len(symbols[:TOP_N_SYMBOLS]),
+                                )
                             if n_entered:
                                 log.info(f"Entries this cycle: {n_entered}")
                         else:

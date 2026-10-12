@@ -152,6 +152,35 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
     _send(text)
 
 
+def notify_scan_summary(regime: dict, signals: list, entered: int,
+                        rejected: list, scan_symbols: int) -> None:
+    """Send one deduplicated scanner outcome summary for a signal batch."""
+    if not signals:
+        return
+    r = regime.get("regime", "?")
+    rows = [
+        f"  {s.get('strategy', '?')} {s.get('symbol', '?')} "
+        f"{s.get('direction', '?')}"
+        for s in signals[:20]
+    ]
+    counts = {}
+    for item in rejected:
+        reason = item.get("reason", "entry rejected")
+        counts[reason] = counts.get(reason, 0) + 1
+    reasons = "\n".join(
+        f"  • {reason}: {count}" for reason, count in counts.items()
+    ) or "  • no rejection recorded"
+    text = (
+        f"📡 <b>Scan Summary</b>\n"
+        f"Regime: <b>{html.escape(str(r))}</b>\n"
+        f"Universe: {scan_symbols} coins\n"
+        f"Signals: <b>{len(signals)}</b> | Entered: <b>{entered}</b>\n\n"
+        f"<b>Signals</b>\n{html.escape(chr(10).join(rows))}\n\n"
+        f"<b>Why not entered</b>\n{html.escape(reasons)}"
+    )
+    _send(text)
+
+
 def notify_exit(position: dict, mode: str = "LIVE") -> None:
     """Send position close notification."""
     strat  = position.get("strategy", "?")

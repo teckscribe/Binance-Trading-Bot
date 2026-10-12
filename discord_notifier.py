@@ -173,6 +173,37 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
     _send_embed(embed)
 
 
+def notify_scan_summary(regime: dict, signals: list, entered: int,
+                        rejected: list, scan_symbols: int) -> None:
+    """Send one scanner outcome summary for a signal batch."""
+    if not signals:
+        return
+    counts = {}
+    for item in rejected:
+        reason = item.get("reason", "entry rejected")
+        counts[reason] = counts.get(reason, 0) + 1
+    reasons = "\n".join(f"• {reason}: {count}" for reason, count in counts.items())
+    if not reasons:
+        reasons = "• no rejection recorded"
+    signal_text = "\n".join(
+        f"{s.get('strategy', '?')} {s.get('symbol', '?')} {s.get('direction', '?')}"
+        for s in signals[:20]
+    )
+    embed = {
+        "title": "📡 Scan Summary",
+        "color": _COLOR_ORANGE if entered < len(signals) else _COLOR_GREEN,
+        "description": signal_text,
+        "fields": [
+            {"name": "Regime", "value": str(regime.get("regime", "?")), "inline": True},
+            {"name": "Universe", "value": str(scan_symbols), "inline": True},
+            {"name": "Signals / Entered", "value": f"{len(signals)} / {entered}", "inline": True},
+            {"name": "Why not entered", "value": reasons[:1024], "inline": False},
+        ],
+        "footer": {"text": _utc_to_ist(datetime.now(timezone.utc))},
+    }
+    _send_embed(embed)
+
+
 def notify_exit(position: dict, mode: str = "LIVE") -> None:
     strat    = position.get("strategy", "?")
     meta     = _STRATEGY_META.get(strat, {"emoji": "⚪", "label": strat})
