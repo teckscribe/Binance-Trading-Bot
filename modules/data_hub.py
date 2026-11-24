@@ -131,15 +131,16 @@ def _fetch_symbol(symbol, need_1h: bool = False, depth_1m: int = 200, depth_1h: 
     Fetch 1m + 15m always. 1h only when a permitted strategy declares
     REQUIRES_1H — and then via the TTL cache rather than every cycle.
 
-    Args:
-        symbol   : e.g. 'BTCUSDT'
-        need_1h  : True iff a strategy scanning this cycle reads df_1h.
-        depth_1m : number of 1m bars to fetch (default 200; strategies
-                   that resample 1m→5m need 1500).
+    Weight optimizations:
+      - 15m limit=90 (weight 1 instead of 2; ML engine only needs >=28 bars)
+      - 1h depth=150 is needed only for TSMOM_4H's 22 approved majors; non-major
+        alts only need depth=10 for NASOS_V4's 3-bar 1h lookback (weight 1 vs 2).
     """
+    from modules.strategies.tsmom_4h import TSMOM4HStrategy
+    sym_depth_1h = depth_1h if symbol in TSMOM4HStrategy.APPROVED_MAJORS else min(depth_1h, 50)
     df_1m  = _rate_gated_fetch(symbol, "1m",  limit=depth_1m)
-    df_15m = _rate_gated_fetch(symbol, "15m", limit=200)   # always fresh — see note above
-    df_1h  = _get_1h(symbol, depth_1h) if need_1h else pd.DataFrame()
+    df_15m = _rate_gated_fetch(symbol, "15m", limit=90)
+    df_1h  = _get_1h(symbol, sym_depth_1h) if need_1h else pd.DataFrame()
     return symbol, df_1m, df_15m, df_1h
 
 

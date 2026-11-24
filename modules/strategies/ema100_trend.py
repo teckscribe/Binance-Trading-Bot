@@ -52,13 +52,14 @@ class EMA100Trend(BaseStrategy):
     STRATEGY_ID = "EMA100_TREND"
     TARGET = "ema_target"
     TRAIL_BAR_MINUTES = 1
-    REQUIRES_1H = True
+    # In live mode _daily() fetches 1d bars directly with a 5-min cache; it
+    # does not use per-symbol 1h bars (1h is only used in offline CSB_BACKTEST).
+    REQUIRES_1H = False
     # Daily strategies run on the core 15m replay; 1m is unnecessary for
     # their entry or stop-management rules.
     # scan() still uses the latest 1m bar for the live entry price and
-    # freshness check. Zero makes data_hub request Binance limit=0 when CSM
-    # is disabled and these daily strategies are the only permitted sources.
-    REQUIRES_1M_DEPTH = 200
+    # freshness check.
+    REQUIRES_1M_DEPTH = 90
 
     def __init__(self):
         self._backtest_daily = {}

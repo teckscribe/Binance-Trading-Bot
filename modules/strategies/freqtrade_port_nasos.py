@@ -54,7 +54,9 @@ def hull_moving_average(close: pd.Series, window: int) -> pd.Series:
 class NASOSv4Port(BaseStrategy):
     STRATEGY_ID = "NASOS_V4"
     REQUIRES_1H = True
-    REQUIRES_1M_DEPTH = 1500
+    # 990 1m bars = 198 resampled 5m bars -> drops Binance kline weight from 10
+    # (limit>=1000) to 5 (limit<1000), cutting NASOS's per-cycle API weight in half.
+    REQUIRES_1M_DEPTH = 990
 
     @staticmethod
     def _to_5m(df_1m: pd.DataFrame) -> pd.DataFrame:
@@ -67,12 +69,12 @@ class NASOSv4Port(BaseStrategy):
         return df_1m.resample('5min').agg(agg).dropna()
 
     def scan(self, symbol: str, df_1m: pd.DataFrame, df_15m: pd.DataFrame, df_1h: pd.DataFrame, regime: dict) -> dict | None:
-        if df_1m is None or len(df_1m) < 1000:
+        if df_1m is None or len(df_1m) < 950:
             return None
 
         df_5m = self._to_5m(df_1m)
 
-        if len(df_5m) < 200:
+        if len(df_5m) < 190:
             return None
 
         close = df_5m['close']
