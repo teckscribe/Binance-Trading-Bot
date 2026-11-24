@@ -34,9 +34,13 @@ _COLOR_PURPLE = 0x9B59B6
 _COLOR_GREY   = 0x95A5A6
 
 _STRATEGY_META = {
-    "CSM":        {"emoji": "🟢", "label": "Cross-Sectional Momentum"},
-    "EMA100_TREND": {"emoji": "🟩", "label": "EMA100 Daily Trend"},
-    "DONCHIAN_55_20": {"emoji": "🟦", "label": "Donchian 55/20 Breakout"},
+    "EMA100_TREND": {"emoji": "🟩", "label": "EMA100 Daily Trend (LONG)"},
+    "TSMOM_4H":     {"emoji": "🟦", "label": "4H Time-Series Momentum"},
+    "NASOS_V4":     {"emoji": "🟣", "label": "NASOS v4 Dip-Buy"},
+    "CSM":          {"emoji": "🟢", "label": "Cross-Sectional Momentum (Retired)"},
+    "DONCHIAN_55_20": {"emoji": "⚪", "label": "Donchian 55/20 Breakout (Retired)"},
+    "REBALANCING_PREMIUM": {"emoji": "⚪", "label": "Rebalancing Premium (Retired)"},
+    "FUNDING_SHORT": {"emoji": "⚪", "label": "Funding Short (Retired)"},
 }
 
 _REGIME_EMOJI = {
@@ -105,8 +109,9 @@ def notify_startup(
 
     scan_note = f"{n_scan} of {n_symbols}" if n_symbols > n_scan > 0 else str(n_symbols)
 
+    mode_tag = "📝 PAPER" if str(regime.get("mode", "")).upper() == "PAPER" else "⚡ LIVE"
     embed = {
-        "title": "🚀 Binance Futures Bot started  ⚡ LIVE",
+        "title": f"🚀 Binance Futures Bot started  {mode_tag}",
         "color": color,
         "fields": [
             {"name": "Regime",   "value": f"{emoji} **{r}**",  "inline": True},
@@ -122,26 +127,6 @@ def notify_startup(
     _send_embed(embed)
 
 
-def _kronos_line(d: dict) -> str:
-    """'+0.0312 (thr 0.025) PASS' for a CSM signal/position; '' otherwise.
-
-    kronos_pred_fav is None when the entry proceeded without a score
-    (fail-open) and absent for non-CSM strategies or when the gate is off.
-    """
-    if d.get("strategy") != "CSM" or "kronos_pred_fav" not in d:
-        return ""
-    pf = d.get("kronos_pred_fav")
-    if pf is None:
-        return "no score (fail-open)"
-    try:
-        from modules import settings_manager as cfg
-        thr = float((d.get("settings_entry") or {}).get("KRONOS_PF_THR", cfg.get("KRONOS_PF_THR")))
-    except Exception:
-        thr = None
-    tag = "" if thr is None else f" (thr {thr:.3f}) {'PASS' if pf >= thr else 'below'}"
-    return f"{pf:+.4f}{tag}"
-
-
 def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None:
     strat     = signal.get("strategy", "?")
     meta      = _STRATEGY_META.get(strat, {"emoji": "⚪", "label": strat})
@@ -153,8 +138,9 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
     tp = signal.get("tp_price")
     tp_str = f"{tp:.4f}" if tp else "Trail"
 
+    mode_tag = "📝 PAPER" if mode == "PAPER" else "⚡ LIVE"
     embed = {
-        "title": f"{meta['emoji']} {signal['symbol']} — {meta['label']}  ⚡ LIVE",
+        "title": f"{meta['emoji']} {signal['symbol']} — {meta['label']}  {mode_tag}",
         "color": color,
         "fields": [
             {"name": "Direction", "value": f"{dir_emoji} **{dirn}**",         "inline": True},
@@ -167,9 +153,6 @@ def notify_signal(signal: dict, size: dict, mode: str, liq_price: float) -> None
             {"name": "Reason",    "value": signal.get("reason", "—"),          "inline": False},
         ],
     }
-    k = _kronos_line(signal)
-    if k:
-        embed["fields"].append({"name": "Kronos", "value": f"**{k}**", "inline": False})
     _send_embed(embed)
 
 
@@ -221,8 +204,9 @@ def notify_exit(position: dict, mode: str = "LIVE") -> None:
     emoji    = "✅" if win else "❌"
     color    = _COLOR_GREEN if win else _COLOR_RED
 
+    mode_tag = "📝 PAPER" if mode == "PAPER" else "⚡ LIVE"
     embed = {
-        "title": f"{emoji} {position['symbol']} CLOSED  ⚡ LIVE",
+        "title": f"{emoji} {position['symbol']} CLOSED  {mode_tag}",
         "color": color,
         "fields": [
             {"name": "Strategy",  "value": f"{meta['emoji']} {meta['label']}", "inline": True},
@@ -236,9 +220,6 @@ def notify_exit(position: dict, mode: str = "LIVE") -> None:
             {"name": "Reason",    "value": position.get("exit_reason", "?"),   "inline": True},
         ],
     }
-    k = _kronos_line(position)
-    if k:
-        embed["fields"].append({"name": "Kronos", "value": k, "inline": True})
     if position.get("regime_entry"):
         rx = position.get("regime_exit")
         val = position["regime_entry"] + (f" → {rx}" if rx and rx != position["regime_entry"] else "")

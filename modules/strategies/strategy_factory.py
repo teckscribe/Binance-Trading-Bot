@@ -2,38 +2,30 @@
 strategies/strategy_factory.py
 Instantiate and return the production strategy objects.
 
-Production set (2), listed in scan-priority order:
-    CSM        - Cross-Sectional Momentum  (4-5x ATR(1h) 24h move, long + short)
-    EMA100_TREND    - Daily EMA100 trend flip
-    DONCHIAN_55_20  - Daily close-confirmed breakout
+Production set (3), listed in scan-priority order:
+    EMA100_TREND - Daily EMA100 trend flip (LONG-only, 3x Daily ATR trail)
+    TSMOM_4H     - 4H Time-Series Momentum on 22 Majors (72h >= 5%, 24h hold)
+    NASOS_V4     - 5m Fast-RSI / EWO Washout Dip-Buy (BULL_TREND + BEAR_TREND)
 
-DELETED 2026-08-20: SMA_OFFSET.
-  Negative in every configuration on the corrected harness with 0.03%/side
-  slippage: -0.072%/trade ungated, -0.109%/trade with MIN_STRENGTH=0.50.
-  Total P&L -21.5% over 90d / 100 symbols. Source file removed.
-
-DELETED 2026-08-19: EI3_V2, VRP, LIQ.
-  Tire 2 backtest (73 volatile coins, 1m intrabar SL/TP) showed all three
-  have negative expectancy: EI3_V2 -0.136%, VRP -0.498%, LIQ -0.059%.
-  Source files removed and all wiring cleaned.
-
-DELETED 2026-08-11: OIB, WKD. Source files removed.
-
-DELETED 2026-09-14: TP (trend_pullback), FF_V2 (funding_fade_v2), GRID,
-  ICHI_V1. All four had been out of production since August and were kept
-  only for backtest_optimizer / the legacy grid-dissolve path; no GRID
-  position has existed for weeks, so the scaffolding went with them.
+DELETED / RETIRED:
+    2026-11-24: CSM, REBALANCING_PREMIUM, DONCHIAN_55_20, FUNDING_SHORT.
+      Retired after 180d + 90d 1m + 1,284-trade live/paper audit kept only
+      the top 3 highest-expectancy strategies.
+    2026-09-14: TP, FF_V2, GRID, ICHI_V1.
+    2026-08-20: SMA_OFFSET.
+    2026-08-19: EI3_V2, VRP, LIQ.
+    2026-08-11: OIB, WKD.
 """
 
-from modules.strategies.base_strategy               import BaseStrategy
-from modules.strategies.cross_sectional_momentum    import CrossSectionalMomentum
-from modules.strategies.ema100_trend              import EMA100Trend
-from modules.strategies.donchian_55_20            import Donchian5520
+from modules.strategies.base_strategy            import BaseStrategy
+from modules.strategies.ema100_trend             import EMA100Trend
+from modules.strategies.tsmom_4h                 import TSMOM4HStrategy
+from modules.strategies.freqtrade_port_nasos     import NASOSv4Port
 
 _ALL_STRATEGIES = [
-    CrossSectionalMomentum(),
     EMA100Trend(),
-    Donchian5520(),
+    TSMOM4HStrategy(),
+    NASOSv4Port(),
 ]
 
 _STRATEGY_MAP = {s.STRATEGY_ID: s for s in _ALL_STRATEGIES}

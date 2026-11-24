@@ -58,11 +58,11 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
+    return ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"]
 
 
 PROD_STRATS = _production_strats()
-STRAT_EMOJI = {"CSM": "🟢", "EMA100_TREND": "🟩", "DONCHIAN_55_20": "🟦"}
+STRAT_EMOJI = {"EMA100_TREND": "🟩", "TSMOM_4H": "🟦", "NASOS_V4": "🟣", "CSM": "🟢", "DONCHIAN_55_20": "⚪"}
 SERVICE   = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -267,7 +267,7 @@ def validate_max_per_strategy(text: str) -> tuple[bool, str, str]:
             continue
         if ":" not in chunk:
             return False, "", (f"'{chunk}' is not STRATEGY:NUMBER. "
-                               f"Example: <code>CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1</code>")
+                               f"Example: <code>EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2</code>")
         sid, _, raw = chunk.partition(":")
         sid = sid.upper()
         if known and sid not in known:
@@ -285,7 +285,7 @@ def validate_max_per_strategy(text: str) -> tuple[bool, str, str]:
         pairs.append((sid, n))
 
     if not pairs:
-        return False, "", "Nothing to set. Example: <code>CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1</code>"
+        return False, "", "Nothing to set. Example: <code>EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2</code>"
 
     value = ",".join(f"{s}:{n}" for s, n in pairs)
 
@@ -1599,7 +1599,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             "Type the coin name to block globally:\n"
             "  <code>XLM</code> — blocks XLMUSDT for all strategies\n\n"
             "Or specify strategies:\n"
-            "  <code>XLM GRID</code> — blocks only for GRID\n",
+            "  <code>XLM NASOS_V4</code> — blocks only for NASOS_V4\n",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ Cancel", callback_data="cancel")
@@ -1668,7 +1668,7 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             "Type the coin name to whitelist:\n"
             "  <code>XLM</code> — whitelist XLMUSDT for all strategies\n\n"
             "Or specify strategies:\n"
-            "  <code>XLM GRID</code> — whitelist only for GRID\n",
+            "  <code>XLM TSMOM_4H</code> — whitelist only for TSMOM_4H\n",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ Cancel", callback_data="cancel")
@@ -1784,9 +1784,9 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
             f"strategy taking every slot.\n\n"
             f"Loaded strategies: <b>{', '.join(known) if known else 'unavailable'}</b>\n\n"
             f"Type <code>STRATEGY:N</code> pairs separated by commas.\n"
-            f"Example: <code>CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1</code>\n\n"
+            f"Example: <code>EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2</code>\n\n"
             f"<i>A strategy left out of the list is UNCAPPED.\n"
-            f"Requires a scanner RESTART.</i>",
+            f"Applies on the scanner's next cycle — no restart needed.</i>",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("❌ Cancel", callback_data="menu_trade")

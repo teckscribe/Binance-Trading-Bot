@@ -1004,6 +1004,8 @@ class OrderEngine:
             "status":         "OPEN",
             "stop_order_id":  None,
         }
+        if "trend_setup" in signal:
+            pos["trend_setup"] = dict(signal["trend_setup"])
 
         # ── Place server-side STOP_MARKET on Binance (safety net) ─────────────
         # FIX: pass contracts_adj so _place_stop_order uses explicit quantity

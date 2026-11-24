@@ -211,11 +211,15 @@ HARD_STOP_PCT       = 0.025      # 2.5% — upper bound for ML P3 SL override
 # — per-strategy leverage was effectively unconfigured. Production IDs added
 # below at the previous default so behaviour is unchanged; tune deliberately.
 STRATEGY_LEVERAGE = {
-    # ── Production ───────────────────────────────────────────────────────────
-    "CSM":   3,
+    # ── Production (Top 3) ───────────────────────────────────────────────────
     "EMA100_TREND": 1,
-    "DONCHIAN_55_20": 1,
+    "TSMOM_4H":     3,
+    "NASOS_V4":     3,
     # ── Archived (retained so historical positions still size correctly) ─────
+    "CSM":          3,
+    "DONCHIAN_55_20": 1,
+    "REBALANCING_PREMIUM": 3,
+    "FUNDING_SHORT": 1,
     "SMA_OFFSET": 3,
     "LIQ":  3,
     "VRP":  3,
@@ -228,6 +232,13 @@ STRATEGY_LEVERAGE = {
     "BBR":  3,
 }
 
+# Daily trend strategies use 3x Daily ATR stops (median ~15-20% width) at 1x
+# leverage. They must NEVER be amplified to GLOBAL_LEVERAGE (3x) and must be
+# allowed up to 20% SL distance (180d study: EMA100_TREND LONG SL<=20% has
+# PF 3.39, +78.3R, whereas SL<=10% rejects 88% of valid daily trend signals).
+DAILY_1X_STRATEGIES = frozenset({"EMA100_TREND", "DONCHIAN_55_20"})
+DAILY_MAX_SL_PCT    = 0.20
+
 MIN_NOTIONAL_USDT = 5.0          # Binance minimum order size in USDT
 
 
@@ -236,7 +247,9 @@ MIN_NOTIONAL_USDT = 5.0          # Binance minimum order size in USDT
 def get_leverage(strategy_id: str) -> int:
     """
     Return the configured leverage for a given strategy.
-    GLOBAL_LEVERAGE > 0 overrides all strategies; 0 uses the table above.
+    GLOBAL_LEVERAGE > 0 overrides intraday strategies; daily 1x trend strategies
+     remain pinned at 1x leverage so a wide daily ATR stop cannot be leveraged.
+    0 uses the table above.
 
     Picked up live — a change via the dashboard or the Telegram/Discord
     /leverage command applies from the next signal onward, no restart needed.
@@ -244,6 +257,8 @@ def get_leverage(strategy_id: str) -> int:
     Returns:
         Integer leverage, capped at MAX_LEVERAGE.
     """
+    if strategy_id in DAILY_1X_STRATEGIES:
+        return 1
     global_lev = cfg.get("GLOBAL_LEVERAGE")
     if global_lev > 0:
         return max(1, min(global_lev, MAX_LEVERAGE))
@@ -297,6 +312,9 @@ def compute_position_size(
     MIN_SL_PCT = min_sl_pct()
     MAX_SL_PCT = max_sl_pct()
     MAX_LEVERAGED_LOSS_PCT = max_leveraged_loss_pct()
+    if strategy_id in DAILY_1X_STRATEGIES:
+        MAX_SL_PCT = max(MAX_SL_PCT, DAILY_MAX_SL_PCT)
+        MAX_LEVERAGED_LOSS_PCT = max(MAX_LEVERAGED_LOSS_PCT, DAILY_MAX_SL_PCT)
 
     # ── Minimum SL distance check ─────────────────────────────────────────────
     # SL tighter than 0.5% is noise — price will hit it on normal spread/wick

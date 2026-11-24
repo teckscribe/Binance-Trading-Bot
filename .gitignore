@@ -29,8 +29,6 @@ __pycache__/
 venv/
 .venv/
 env/
-kronos/venv/
-kronos/logs/
 
 # ── Editor junk ──────────────────────────────────────────────────────────────
 .vscode/

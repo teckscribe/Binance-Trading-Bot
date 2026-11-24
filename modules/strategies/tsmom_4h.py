@@ -49,7 +49,17 @@ class TSMOM4HStrategy(BaseStrategy):
     TP_ATR_MULT = 4.0
     MIN_MOM_PCT = 0.05     # default; DCB 1.6.5: 1.5% admits ~850 fee-paying noise trades
 
+    # 22 approved liquid majors for TSMOM_4H (prevents illiquid mid-cap whipsaws)
+    APPROVED_MAJORS = frozenset({
+        "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT",
+        "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "TRXUSDT", "NEARUSDT",
+        "LTCUSDT", "UNIUSDT", "APTUSDT", "SUIUSDT", "ICPUSDT", "ETCUSDT",
+        "FILUSDT", "ATOMUSDT", "ARBUSDT", "AAVEUSDT",
+    })
+
     def scan(self, symbol: str, df_1m: pd.DataFrame, df_15m: pd.DataFrame, df_1h: pd.DataFrame, regime: dict) -> dict:
+        if symbol not in self.APPROVED_MAJORS:
+            return None
         if df_1h is None or len(df_1h) < (self.LOOKBACK_4H_BARS * 4 + 20):
             return None
         df_1h = _time_indexed(df_1h)

@@ -59,7 +59,7 @@ def _production_strategy_ids() -> list[str]:
     except Exception:
         pass
     # Fallback if the factory cannot be imported (keeps logging working).
-    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
+    return ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"]
 
 
 STRATEGIES = _production_strategy_ids()
@@ -259,7 +259,6 @@ _CONTEXT_KEYS = (
     "hour_utc_entry", "dow_entry", "n_open_before",
     "signal_price", "signal_strength", "signal_reason", "normalized_mom",
     "vol_ratio", "sl_pct_planned", "fill_slippage_pct",
-    "kronos_pred_fav", "kronos_ts",
     "ml_signal_id", "ml_risk_mult", "ml_win_prob", "ml_gate_action",
     "ml_sl_atr_mult", "ml_trail_mult",
     "mfe", "mae", "sl_moves", "settings_entry",

@@ -27,22 +27,21 @@ class DailyTrendTests(unittest.TestCase):
         self.assertIn("ema_target", result)
         self.assertIn("donchian_target", result)
 
-    def test_factory_contains_only_csm_and_daily_rules(self):
+    def test_factory_contains_top3_strategies(self):
         from modules.strategies.strategy_factory import StrategyFactory
         self.assertEqual(
             [s.STRATEGY_ID for s in StrategyFactory.get_all()],
-            ["CSM", "EMA100_TREND", "DONCHIAN_55_20"],
+            ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"],
         )
 
-    def test_daily_adapters_are_disabled_by_default(self):
+    def test_daily_adapters_defaults(self):
         from modules import settings_manager as cfg
-        self.assertFalse(cfg.SPEC_BY_KEY["EMA100_TREND_ENABLED"]["default"])
-        self.assertFalse(cfg.SPEC_BY_KEY["DONCHIAN_55_20_ENABLED"]["default"])
+        self.assertTrue(cfg.SPEC_BY_KEY["EMA100_TREND_ENABLED"]["default"])
         self.assertEqual(Donchian5520().TARGET, "donchian_target")
 
     def test_regime_matrix_contains_only_production_ids(self):
         from modules.regime_engine import REGIME_STRATEGY_PERMISSIONS
-        expected = {"CSM", "EMA100_TREND", "DONCHIAN_55_20"}
+        expected = {"EMA100_TREND", "TSMOM_4H", "NASOS_V4"}
         for permissions in REGIME_STRATEGY_PERMISSIONS.values():
             self.assertTrue(set(permissions) <= expected)
 

@@ -512,10 +512,9 @@ _current_regime: dict = {}
 # across config changes.
 _ENTRY_SETTINGS_KEYS = (
     "GLOBAL_LEVERAGE", "MAX_LEVERAGED_LOSS_PCT", "MIN_STRENGTH", "MAX_CONCURRENT",
-    "MAX_PER_STRATEGY", "KRONOS_GATE", "KRONOS_PF_THR",
-    "CSM_MOM_LO", "CSM_MOM_HI", "CSM_SL_ATR_LONG", "CSM_SL_ATR_SHORT",
-    "CSM_TP_ATR_LONG", "CSM_TP_ATR_SHORT", "CSM_PROFIT_LADDER", "CSM_MAX_HOLD_MIN",
-    "EMA100_TREND_ENABLED", "DONCHIAN_55_20_ENABLED",
+    "MAX_PER_STRATEGY",
+    "EMA100_TREND_ENABLED", "TSMOM_MIN_MOM_PCT",
+    "NASOS_SL_MODE", "NASOS_SL_FLAT", "NASOS_SL_ATR", "NASOS_TP_ATR", "PORT_MAX_HOLD_MIN",
 )
 
 
@@ -550,9 +549,6 @@ def _stamp_entry_context(pos: dict, sig: dict, size: dict, regime: dict,
             # adverse fill vs the signal price, as a fraction (positive = worse)
             "fill_slippage_pct":    round(sign * (fill - sig_px) / sig_px, 6) if sig_px > 0 else None,
             "liq_price":            liq_price,
-            # Kronos
-            "kronos_pred_fav":      sig.get("kronos_pred_fav"),
-            "kronos_ts":            sig.get("kronos_ts"),
             # ML engine
             "ml_risk_mult":         ml_adj.get("risk_mult"),
             "ml_win_prob":          ml_adj.get("win_prob"),
@@ -1256,103 +1252,7 @@ def _scan_for_signals(
         log.info(f"[NEAR-MISS] {' | '.join(parts)}")
 
     candidates.sort(key=lambda s: s.get("strength", 1.0), reverse=True)
-
-    # Queue Kronos candidates AFTER the sort. The worker scores strictly in
-    # queue order and _execute_entries() tries candidates strongest-first, so
-    # queuing inside the scan loop left the candidate that actually executes
-    # waiting behind weaker ones — the cause of the 12-27s score latencies and
-    # the fail-open entries in EXPERIMENT_LOG 0.5.15 / 0.5.18. Cost: the worker
-    # loses the tail of the scan loop as head start (sub-2s, CPU-only work on
-    # already-fetched data); buys the top-ranked candidate first place in line.
-    for _c in candidates:
-        if _c.get("strategy") in KRONOS_SHADOW_STRATEGIES:
-            try:
-                from kronos.shadow_client import log_candidate
-                _c["kronos_ts"] = log_candidate(
-                    _c.get("symbol"),
-                    _c.get("direction"),
-                    _c.get("entry_price"),
-                    _c.get("strength"),
-                    strategy=_c.get("strategy"),
-                )
-            except Exception:
-                pass
-
     return candidates
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Kronos gate
-# ─────────────────────────────────────────────────────────────────────────────
-#
-# The Kronos worker (kronos/shadow_worker.py, own venv, own process) scores
-# every CSM candidate the scan queues. With KRONOS_GATE=live a CSM entry is
-# skipped when its pred_fav is below KRONOS_PF_THR. Evidence and the decision
-# rule are in docs/EXPERIMENT_LOG.md 0.4 (N=81: blocked set PF 0.55).
-#
-# FAIL-OPEN by design: no score within KRONOS_GATE_WAIT_SEC (worker down,
-# model reloading, insufficient context) means the entry proceeds exactly as
-# before the gate existed, and no further waiting happens that cycle so a dead
-# worker costs one timeout, not one per signal.
-
-# Strategies whose candidates are queued for Kronos scoring (shadow data), and
-# the subset the live gate actually acts on. NASOS_V4 is shadow-only until it
-# has its own verdict — the 0.025 threshold was measured on CSM and does not
-# transfer. Module constants — changing them needs a restart; deliberately
-# not a hot setting so the gated set cannot be widened from a bot command.
-KRONOS_SHADOW_STRATEGIES = ("CSM",)
-KRONOS_GATE_STRATEGIES   = ("CSM",)
-
-
-def _kronos_gate(sig: dict, waited_out: dict) -> bool:
-    """True = entry may proceed. Only KRONOS_GATE_STRATEGIES are ever gated."""
-    if sig.get("strategy") not in KRONOS_GATE_STRATEGIES:
-        return True
-    mode = cfg.get("KRONOS_GATE")
-    if mode == "off":
-        return True
-
-    sym, ts = sig.get("symbol"), sig.get("kronos_ts")
-    score = None
-    if ts:
-        try:
-            from kronos.shadow_client import wait_for_score
-            wait = 0 if waited_out.get("hit") else cfg.get("KRONOS_GATE_WAIT_SEC")
-            score = wait_for_score(sym, ts, wait)
-        except Exception as exc:
-            log.warning(f"[KRONOS] score lookup failed [{sym}]: {exc}")
-
-    if score is None or score.get("err") or score.get("pred_fav") is None:
-        if not waited_out.get("hit"):
-            waited_out["hit"] = True
-            log.warning(
-                f"[KRONOS] no score for {sym} within "
-                f"{cfg.get('KRONOS_GATE_WAIT_SEC')}s "
-                f"({(score or {}).get('err', 'worker silent')}) — fail-open, "
-                f"not waiting again this cycle"
-            )
-        sig["kronos_pred_fav"] = None
-        return True
-
-    pf  = float(score["pred_fav"])
-    thr = cfg.get("KRONOS_PF_THR")
-    sig["kronos_pred_fav"] = pf
-    if pf >= thr:
-        log.info(f"[KRONOS] {sym} pred_fav={pf:+.4f} >= {thr:.3f} — pass")
-        return True
-
-    if mode == "shadow":
-        log.info(f"[KRONOS] shadow: {sym} pred_fav={pf:+.4f} < {thr:.3f} — "
-                 f"would gate, trading anyway")
-        return True
-
-    # Journal only. A block is the gate's normal outcome ~76% of the time
-    # (8-12 per cycle); the entry notification already reports what traded
-    # and shadow_scores.jsonl holds every verdict, so a per-block Telegram
-    # ping was pure noise and arrived labelled "Bot Error".
-    log.info(f"[KRONOS] GATED {sym} {sig.get('direction')} pred_fav={pf:+.4f} "
-             f"< {thr:.3f} — entry skipped")
-    return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1373,7 +1273,6 @@ def _execute_entries(
     ML engine called per signal for feature logging and adaptive sizing.
     """
     entries = 0
-    _kronos_waited_out: dict = {}    # one scoring timeout per cycle, see _kronos_gate
 
     def reject(sig, reason):
         if report is not None:
@@ -1440,11 +1339,6 @@ def _execute_entries(
         # ── Skip if symbol already open ───────────────────────────────────────
         if live.is_symbol_active(sig["symbol"]):
             reject(sig, "symbol already has an open position")
-            continue
-
-        # ── Kronos gate (CSM only; see _kronos_gate) ─────────────────────────
-        if not _kronos_gate(sig, _kronos_waited_out):
-            reject(sig, "Kronos gate")
             continue
 
         # ── LLM Advisor Veto — DISABLED ──────────────────────────────────────

@@ -489,7 +489,6 @@ def log_outcome(position: dict) -> None:
         "fee_usdt":       position.get("fee_usdt"),
         "pnl_usdt_net":   position.get("pnl_usdt_net"),
         "fill_slippage_pct": position.get("fill_slippage_pct"),
-        "kronos_pred_fav": position.get("kronos_pred_fav"),
     }
     try:
         _append_jsonl(_OUTCOMES_PATH, record)

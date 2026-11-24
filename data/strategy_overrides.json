@@ -1,12 +1,17 @@
 {
-  "CSM": {
+  "EMA100_TREND": {
     "disabled": false,
-    "set_at": "2026-09-14T05:05:12.881682+00:00",
+    "set_at": "2026-11-24T17:09:30+00:00",
+    "reason": "manual enable"
+  },
+  "TSMOM_4H": {
+    "disabled": false,
+    "set_at": "2026-11-24T17:09:30+00:00",
     "reason": "manual enable"
   },
   "NASOS_V4": {
     "disabled": false,
-    "set_at": "2026-09-14T05:05:14.192505+00:00",
+    "set_at": "2026-11-24T17:09:30+00:00",
     "reason": "manual enable"
   }
 }

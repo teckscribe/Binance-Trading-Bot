@@ -70,10 +70,8 @@ def _s(key, group, type_, default, label, help_="", hot=True, **kw):
 
 
 SPEC = [
-    _s("EMA100_TREND_ENABLED", "Strategies", "bool", False,
-       "EMA100 daily trend", "Daily EMA100 flip with a 3 ATR trailing stop; PAPER validation first."),
-    _s("DONCHIAN_55_20_ENABLED", "Strategies", "bool", False,
-       "Donchian 55/20 breakout", "Daily close-confirmed 55/20 breakout with a 3 ATR trailing stop; PAPER validation first."),
+    _s("EMA100_TREND_ENABLED", "Strategies", "bool", True,
+       "EMA100 daily trend (LONG-only)", "Daily EMA100 flip (LONG-only) with a 3 ATR trailing stop (180d PF 3.39, +78.3R)."),
     # ── Account ──────────────────────────────────────────────────────────────
     _s("ACCOUNT_EQUITY_USDT", "Account", "float", 10.0, "Account equity (USDT)",
        "Base for position sizing. Risk per trade is 1% of this. In PAPER mode "
@@ -107,9 +105,9 @@ SPEC = [
     _s("MAX_CONCURRENT", "Risk", "int", 3, "Max concurrent positions",
        "Total open positions across all strategies.", min=1, max=20),
     _s("MAX_PER_STRATEGY", "Risk", "csv_caps",
-       "CSM:3,EMA100_TREND:1,DONCHIAN_55_20:1",
+       "EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2",
        "Per-strategy caps",
-       "Format: CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1. A strategy MISSING "
+       "Format: EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2. A strategy MISSING "
        "from this string is UNCAPPED, not disabled - it may take every free "
        "slot (risk_engine.is_strategy_cap_hit returns False on a missing key). "
        "The scanner warns at startup for any loaded strategy with no entry."),
@@ -148,49 +146,11 @@ SPEC = [
        "Refuse to resume positions left unmanaged longer than this.",
        min=1, max=168, step="1"),
 
-    # ── CSM ──────────────────────────────────────────────────────────────────
-    _s("CSM_ALLOW_LONG", "CSM", "bool", True, "Allow LONG"),
-    _s("CSM_ALLOW_SHORT", "CSM", "bool", True, "Allow SHORT"),
+    # ── TSMOM_4H ─────────────────────────────────────────────────────────────
     _s("TSMOM_MIN_MOM_PCT", "TSMOM", "float", 0.05, "TSMOM min 72h momentum",
        "Fraction. 0.05 = enter only if the coin rose >= 5% over the last 72h "
-       "(18 closed 4h bars). DCB 1.6.5: 1.5% -> PF 1.33, 5% -> PF 1.50, 7% -> 1.54."),
-    _s("CSM_CLOSED_BAR_MOM", "CSM", "bool", False, "Momentum on closed 1h bars",
-       "OFF = shipped behaviour (reading includes the forming hourly bar; 28 % of "
-       "mid-hour signals repaint away, log 0.5.28). ON = closed bars only, so live "
-       "matches the backtest; entries lag up to 59 min."),
-    _s("CSM_MOM_LO", "CSM", "float", 3.0, "Momentum band low (x ATR)",
-       "Entry when |24h move| / ATR(1h) is in [low, high).", min=0.5, max=20, step="0.1"),
-    _s("CSM_MOM_HI", "CSM", "float", 4.0, "Momentum band high (x ATR)",
-       min=0.5, max=20, step="0.1"),
-    _s("CSM_SL_ATR_LONG", "CSM", "float", 2.0, "SL x ATR(15m), long", min=0.1, max=20, step="0.05"),
-    _s("CSM_TP_ATR_LONG", "CSM", "float", 4.0, "TP x ATR(15m), long", min=0.1, max=20, step="0.05"),
-    _s("CSM_SL_ATR_SHORT", "CSM", "float", 2.0, "SL x ATR(15m), short", min=0.1, max=20, step="0.05"),
-    _s("CSM_TP_ATR_SHORT", "CSM", "float", 4.0, "TP x ATR(15m), short", min=0.1, max=20, step="0.05"),
-    _s("CSM_MIN_SL_PCT", "CSM", "float", 0.02, "Min stop distance (fraction)",
-       "Floor on the ATR-derived stop. Shorts whose raw stop is under this "
-       "are skipped.", min=0.001, max=0.5, step="0.001"),
-    _s("CSM_MAX_HOLD_MIN", "CSM", "int", 1440, "Max hold (min)",
-       "480 = 8h, 1440 = 24h.", min=30, max=10080),
-    _s("CSM_LADDER_MODE", "CSM", "choice", "pct", "Ladder rung units",
-       "pct = absolute rungs (+1.0/2.5/4.0%), the shipped behaviour. "
-       "atr = the same rungs as multiples of the stop distance (0.5/1.25/2.0R), "
-       "identical at a 2% stop and risk-proportional above it. Log 0.5.36.",
-       options=["pct", "atr"]),
-    _s("CSM_MAX_SL_PCT", "CSM", "float", 0.05, "Max stop width (fraction)",
-       "0 = off. Rejects CSM signals whose stop exceeds this fraction of entry. "
-       "Set to 0.05 on 2026-09-26 (log 0.5.37): backtest E[net] rises from "
-       "+0.0146% to +0.0654%/trade and PF 1.01 -> 1.06 while keeping 90% of "
-       "signals; live (N 68) PF 0.86 -> 1.55. The curve is flat 4-6% so 5% is "
-       "the middle of the plateau, not the in-sample peak.",
-       min=0.0, max=0.5, step="0.005"),
-    _s("CSM_PROFIT_LADDER", "CSM", "choice", "on", "Profit ladder",
-       "on = lock +0.15% at +1%, +1.5% at +2.5%, +2.5% at +4%. "
-       "off = breakeven then 2xATR trail.", options=["on", "off"]),
-    _s("CSM_VOL_RATIO_MIN", "CSM", "float", 1.0, "Min volume ratio",
-       "Last completed 1h volume must be >= this x the 24h hourly average. "
-       "0 = off.", min=0.0, max=20, step="0.1"),
-    _s("CSM_LEGACY_BE", "CSM", "bool", False, "Legacy breakeven",
-       "Only used when the ladder is off."),
+       "(18 closed 4h bars). DCB 1.6.5: 1.5% -> PF 1.33, 5% -> PF 1.50, 7% -> 1.54.",
+       min=0.01, max=0.50, step="0.005"),
 
     # ── NASOS ────────────────────────────────────────────────────────────────
     _s("NASOS_SL_MODE", "NASOS", "choice", "flat", "Stop mode",
@@ -202,20 +162,6 @@ SPEC = [
     _s("PORT_MAX_HOLD_MIN", "NASOS", "int", 0, "Max hold for ports (min)",
        "Time exit for the freqtrade ports. 0 = off (historical behaviour).",
        min=0, max=10080),
-
-    # ── Kronos gate ──────────────────────────────────────────────────────────
-    _s("KRONOS_GATE", "Kronos", "choice", "live", "Kronos gate mode",
-       "off = ignore Kronos. shadow = log what would be gated, trade anyway. "
-       "live = skip CSM entries whose pred_fav is below the threshold. "
-       "If no score arrives in time the entry proceeds (fail-open).",
-       options=["off", "shadow", "live"]),
-    _s("KRONOS_PF_THR", "Kronos", "float", 0.025, "Kronos pred_fav threshold",
-       "CSM entry needs pred_fav >= this. First live reading (N=81, "
-       "2026-09-14): 0.020 PASS PF 1.75 / BLOCKED 0.55; 0.025 PASS PF 3.96 "
-       "(N=19). See EXPERIMENT_LOG 0.4.", min=0.0, max=0.2, step="0.001"),
-    _s("KRONOS_GATE_WAIT_SEC", "Kronos", "int", 8, "Max wait for a score (s)",
-       "How long the entry step waits for the shadow worker to score a "
-       "candidate before proceeding without it.", min=0, max=60),
 
     # ── Machine learning ─────────────────────────────────────────────────────
     _s("ML_PHASE", "ML", "int", 1, "ML phase", min=1, max=4),

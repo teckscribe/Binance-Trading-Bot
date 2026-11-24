@@ -210,7 +210,7 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
+    return ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"]
 
 
 _STRATS = _production_strats()

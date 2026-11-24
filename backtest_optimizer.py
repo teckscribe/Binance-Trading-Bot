@@ -82,9 +82,9 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-from modules.strategies.cross_sectional_momentum  import CrossSectionalMomentum
 from modules.strategies.ema100_trend              import EMA100Trend
-from modules.strategies.donchian_55_20            import Donchian5520
+from modules.strategies.tsmom_4h                  import TSMOM4HStrategy
+from modules.strategies.freqtrade_port_nasos      import NASOSv4Port
 
 from modules.risk_engine import (
     MAX_MARGIN_PCT, max_concurrent, daily_loss_cap, weekly_loss_cap,
@@ -155,19 +155,19 @@ FORMING_1H      = os.getenv("BT_FORMING_1H", "false").lower() == "true"
 # OIB and WKD deleted 2026-08-11 — their source files are gone, so they can no
 # longer be backtested even with --strategies. See strategy_factory.py.
 STRATEGY_CLASSES = {
-    "CSM":   CrossSectionalMomentum,
     "EMA100_TREND": EMA100Trend,
-    "DONCHIAN_55_20": Donchian5520,
+    "TSMOM_4H":     TSMOM4HStrategy,
+    "NASOS_V4":     NASOSv4Port,
 }
 
 def _load_optional_strategy(sid):
     """Load retired/research strategies only when explicitly requested."""
-    if sid == "NASOS_V4":
-        from modules.strategies.freqtrade_port_nasos import NASOSv4Port
-        return NASOSv4Port
-    if sid == "TSMOM_4H":
-        from modules.strategies.tsmom_4h import TSMOM4HStrategy
-        return TSMOM4HStrategy
+    if sid == "CSM":
+        from modules.strategies.cross_sectional_momentum import CrossSectionalMomentum
+        return CrossSectionalMomentum
+    if sid == "DONCHIAN_55_20":
+        from modules.strategies.donchian_55_20 import Donchian5520
+        return Donchian5520
     if sid == "REBALANCING_PREMIUM":
         from modules.strategies.rebalancing_premium import RebalancingPremiumStrategy
         return RebalancingPremiumStrategy
@@ -183,7 +183,7 @@ def _production_strategy_ids() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "NASOS_V4"]
+    return ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"]
 
 
 PRODUCTION_IDS = _production_strategy_ids()

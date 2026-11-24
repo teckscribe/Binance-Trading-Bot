@@ -482,14 +482,24 @@ def classify_regime(btc_1h=None, eth_1h=None, sol_1h=None):
 # order because every strategy currently reports a constant strength of 1.0 —
 # so signal VOLUME, not signal QUALITY, decides what actually trades.
 REGIME_STRATEGY_PERMISSIONS = {
-    # Production set: CSM plus the two new daily candidates. The daily rules
-    # remain opt-in and disabled by default; regime-neutral routing keeps the
-    # initial PAPER observation comparable across the three market states.
-    "BULL_TREND":  {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
-    "BEAR_TREND":  {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
-    "RANGING":     {"CSM": True, "EMA100_TREND": True, "DONCHIAN_55_20": True},
-    "OVERSOLD":    {"CSM": False, "EMA100_TREND": False, "DONCHIAN_55_20": False},
-    "OVERHEATED":  {"CSM": False, "EMA100_TREND": False, "DONCHIAN_55_20": False},
+    # Top-3 validated production roster (2026-11-24 historical audit):
+    #   1. EMA100_TREND (LONG-only, SL<=20%, 1x lev):
+    #      - 180d BULL_TREND: PF 2.18 (+24.5R)
+    #      - 180d RANGING:    PF 3.09 (+45.5R)
+    #      - Overall LONG:    PF 3.39 (+4.04%/trade, +78.3R)
+    #   2. TSMOM_4H (22 approved majors, 72h mom >= 5%, 24h hold):
+    #      - 90d 1m BULL_TREND: PF(R) 2.43 (+79.6R); 180d BULL_TREND: PF(R) 1.19 (+16.2R)
+    #      - 90d 1m BEAR_TREND: PF(R) 1.70 (+8.6R);  180d BEAR_TREND: PF(R) 1.43 (+10.4R)
+    #      - Blocked in RANGING (180d RANGING PF 0.72, -55.1R).
+    #   3. NASOS_V4 (5m fast-RSI / EWO washout dip-buy, strength >= 0.50):
+    #      - 90d 1m BULL_TREND: PF 1.96 (82.9% win, +19.3R); Live BULL: PF 1.55 (81.0% win)
+    #      - 90d 1m BEAR_TREND: PF 1.51 (75.9% win, +9.7R)
+    #      - Blocked in RANGING (90d 1m RANGING PF 0.86, -12.1R).
+    "BULL_TREND":  {"EMA100_TREND": True,  "TSMOM_4H": True,  "NASOS_V4": True},
+    "BEAR_TREND":  {"EMA100_TREND": False, "TSMOM_4H": True,  "NASOS_V4": True},
+    "RANGING":     {"EMA100_TREND": True,  "TSMOM_4H": False, "NASOS_V4": False},
+    "OVERSOLD":    {"EMA100_TREND": False, "TSMOM_4H": False, "NASOS_V4": False},
+    "OVERHEATED":  {"EMA100_TREND": False, "TSMOM_4H": False, "NASOS_V4": False},
 }
 
 ''' Historical pre-daily-strategy matrix retained below as documentation only.

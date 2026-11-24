@@ -60,11 +60,11 @@ def _production_strats() -> list[str]:
             return ids
     except Exception:
         pass
-    return ["CSM", "EMA100_TREND", "DONCHIAN_55_20"]
+    return ["EMA100_TREND", "TSMOM_4H", "NASOS_V4"]
 
 
 PROD_STRATS = _production_strats()
-STRAT_EMOJI = {"CSM": "🟢", "EMA100_TREND": "🟩", "DONCHIAN_55_20": "🟦"}
+STRAT_EMOJI = {"EMA100_TREND": "🟩", "TSMOM_4H": "🟦", "NASOS_V4": "🟣", "CSM": "🟢", "DONCHIAN_55_20": "⚪"}
 SERVICE    = "csb"
 
 _BOT_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -180,7 +180,7 @@ def validate_max_per_strategy(text: str):
         if not chunk:
             continue
         if ":" not in chunk:
-            return False, "", f"`{chunk}` is not STRATEGY:NUMBER. Example: `CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`"
+            return False, "", f"`{chunk}` is not STRATEGY:NUMBER. Example: `EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2`"
         sid, _, raw = chunk.partition(":")
         sid = sid.upper()
         if known and sid not in known:
@@ -197,7 +197,7 @@ def validate_max_per_strategy(text: str):
         pairs.append((sid, n))
 
     if not pairs:
-        return False, "", "Nothing to set. Example: `CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`"
+        return False, "", "Nothing to set. Example: `EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2`"
 
     value = ",".join(f"{s}:{n}" for s, n in pairs)
     warn = []
@@ -944,8 +944,8 @@ class TradeControlsView(discord.ui.View):
             f"How many of the concurrent slots each strategy may hold. Stops one "
             f"strategy taking every slot.\n\n"
             f"Loaded: **{', '.join(known) if known else 'unavailable'}**\n\n"
-            f"Change with `/max_per_strategy CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1`\n"
-            f"*A strategy left out is UNCAPPED. Requires a scanner RESTART.*",
+            f"Change with `/max_per_strategy EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2`\n"
+            f"*A strategy left out is UNCAPPED. Applies on next cycle.*",
             view=TradeControlsView())
 
     @discord.ui.button(label="⚠️ Reset Caps", style=discord.ButtonStyle.secondary, row=2)
@@ -1456,7 +1456,7 @@ async def cmd_max_concurrent(interaction: discord.Interaction, count: int = None
 
 
 @tree.command(name="max_per_strategy", description="View or change per-strategy slot caps", guild=GUILD_OBJ)
-@app_commands.describe(caps="e.g. CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1 (omit to view current)")
+@app_commands.describe(caps="e.g. EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2 (omit to view current)")
 async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = None):
     if not _allowed(interaction):
         return await _deny(interaction)
@@ -1468,7 +1468,7 @@ async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = Non
             f"📐 **Per-Strategy Caps:** `{_max_per_strategy_status()}`\n"
             f"Max concurrent: **{_max_concurrent_status()}**\n"
             f"Loaded: {', '.join(known) if known else 'unavailable'}\n\n"
-            f"Use `/max_per_strategy CSM:1,EMA100_TREND:1,DONCHIAN_55_20:1` to change.\n"
+            f"Use `/max_per_strategy EMA100_TREND:2,TSMOM_4H:2,NASOS_V4:2` to change.\n"
             f"*A strategy left out is UNCAPPED.*")
         return
 
@@ -1495,7 +1495,7 @@ async def cmd_max_per_strategy(interaction: discord.Interaction, caps: str = Non
 @app_commands.describe(
     action="add or remove",
     coin="Coin symbol (e.g. BTC)",
-    strategy="Optional: restrict to one strategy (e.g. CSM)",
+    strategy="Optional: restrict to one strategy (e.g. TSMOM_4H, NASOS_V4, EMA100_TREND)",
 )
 async def cmd_whitelist(
     interaction: discord.Interaction,
@@ -1526,7 +1526,7 @@ async def cmd_whitelist(
 
     if not coin:
         await interaction.followup.send(
-            "Usage: `/whitelist add BTC` or `/whitelist remove BTC CSM`")
+            "Usage: `/whitelist add BTC` or `/whitelist remove BTC TSMOM_4H`")
         return
 
     symbol = coin.upper()

@@ -1,17 +1,5 @@
 // app.js - CSB Web Server Frontend Logic
 
-// Kronos score for a CSM trade/position. null = entered with no score
-// (fail-open); absent = non-CSM or gate off.
-function kronosCell(r) {
-    if (r.strategy !== "CSM" || !("kronos_pred_fav" in r)) return '<span class="dim">—</span>';
-    const pf = r.kronos_pred_fav;
-    if (pf === null || pf === undefined) return '<span class="text-amber" title="entered without a score (fail-open)">n/a</span>';
-    const thr = Number(r.settings_entry?.KRONOS_PF_THR);
-    const ok = isFinite(thr) ? pf >= thr : null;
-    const cls = ok === null ? "" : ok ? "text-green" : "text-amber";
-    return `<span class="${cls}" title="${isFinite(thr) ? "threshold " + thr : ""}">${(pf >= 0 ? "+" : "") + Number(pf).toFixed(4)}</span>`;
-}
-
 function regimeCell(r) {
     if (!r.regime_entry) return '<span class="dim">—</span>';
     const short = (x) => String(x).replace("_TREND", "");
@@ -129,8 +117,8 @@ async function fetchStatus() {
         if(tbody && data.active_positions) {
             if(data.active_positions.length === 0) {
                 tbody.innerHTML = isOffline
-                    ? '<tr><td colspan="12" class="empty-msg">Scanner stopped — no open positions.</td></tr>'
-                    : '<tr><td colspan="12" class="empty-msg">No active open positions. Auto-trader scanning market...</td></tr>';
+                    ? '<tr><td colspan="11" class="empty-msg">Scanner stopped — no open positions.</td></tr>'
+                    : '<tr><td colspan="11" class="empty-msg">No active open positions. Auto-trader scanning market...</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 // If the scanner is down these rows are a frozen snapshot, not
@@ -138,7 +126,7 @@ async function fetchStatus() {
                 // Label them rather than letting them read as current.
                 if (isOffline) {
                     const warn = document.createElement('tr');
-                    warn.innerHTML = `<td colspan="12" class="empty-msg" style="color:var(--warn);">
+                    warn.innerHTML = `<td colspan="11" class="empty-msg" style="color:var(--warn);">
                         ⚠️ Scanner is stopped — these are the last known positions, not live data.
                         Check Telegram for actual close confirmations.</td>`;
                     tbody.appendChild(warn);
@@ -163,7 +151,6 @@ async function fetchStatus() {
                         <td class="${pnlClass}">${roiNum.toFixed(2)}% <span class="pnl-usd">${usd(pnlUsdt)}</span></td>
                         <td>$${pos.sl_price ? pos.sl_price.toFixed(4) : '--'}</td>
                         <td>${pos.duration_min || 0}</td>
-                        <td>${kronosCell(pos)}</td>
                         <td><button class="btn-square-off" onclick="squareOff('${pos.symbol}','${pos.direction}',this,${pos.pnl_equity_pct ?? 'null'},${pnlUsdt ?? 'null'})">Square Off</button></td>
                     `;
                     tbody.appendChild(tr);
@@ -194,7 +181,7 @@ async function fetchTrades() {
         const tbody = document.getElementById('decisions-tbody');
         if(tbody && data.trades) {
             if(data.trades.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="13" class="empty-msg">No closed trades yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="empty-msg">No closed trades yet.</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 data.trades.forEach(trade => {
@@ -243,7 +230,6 @@ async function fetchTrades() {
                         <td>${trade.exit_reason || trade.reason || "--"}</td>
                         <td class="${pnlClass}">${pnl}% <span class="pnl-usd">${usd(pnlUsdt)}</span></td>
                         <td>${trade.duration_min || 0}m</td>
-                        <td>${kronosCell(trade)}</td>
                         <td>${regimeCell(trade)}</td>
                     `;
                     tbody.appendChild(tr);
@@ -804,85 +790,3 @@ document.getElementById('set-reset')?.addEventListener('click', () => {
     setStatus("Changes discarded.");
 });
 
-
-// ─── Kronos / whale shadow-experiment progress ───────────────────────────────
-//
-// Both experiments are observe-only and only deliver a verdict once enough
-// executed CSM trades can be matched to their shadow records (Kronos: 80,
-// whale: 120). The panel shows how close each is, plus worker health.
-
-let KP_TIMER = null;
-
-function kpFmtTs(s) {
-    if (!s) return "—";
-    const d = new Date(s);
-    return isNaN(d) ? String(s) : d.toLocaleString();
-}
-
-function kpFill(prefix, b) {
-    const set = (id, v) => { const el = document.getElementById(`kp-${prefix}-${id}`); if (el) el.textContent = v; };
-    const fill = document.getElementById(`kp-${prefix}-fill`);
-    if (fill) {
-        fill.style.width = `${b.pct}%`;
-        fill.classList.toggle("done", b.state === "READY");
-    }
-    const st = document.getElementById(`kp-${prefix}-state`);
-    if (st) {
-        st.textContent = b.state === "READY" ? "READY — run verdict" : "COLLECTING";
-        st.className = "pill " + (b.state === "READY" ? "pill-green" : "pill-amber");
-    }
-    set("matched", b.matched); set("target", b.target); set("pct", b.pct);
-    set("remaining", b.remaining); set("scored", b.scored); set("err", b.errors);
-    set("backlog", b.backlog); set("last", kpFmtTs(b.last_activity));
-    if (b.would_gate !== undefined) { set("gate", b.would_gate); set("gaterate", b.gate_rate_pct); }
-}
-
-async function fetchKronosProgress() {
-    const upd = document.getElementById("kp-updated");
-    try {
-        const r = await fetch("/api/kronos/progress");
-        const d = await r.json();
-        if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
-        kpFill("k", d.kronos);
-        kpFill("w", d.whale);
-        // One line per non-gated strategy in the shadow queue (NASOS_V4, TSMOM_4H,
-        // REBALANCING_PREMIUM, ...) - the list comes from the worker's report,
-        // so a strategy added to KRONOS_SHADOW_STRATEGIES shows up here unedited.
-        const wo = document.getElementById("kp-w-others");
-        if (wo) wo.innerHTML = Object.entries(d.whale.by_strategy || {})
-            .filter(([sid]) => sid !== "CSM")
-            .map(([sid, s]) => `<div class="kp-sub">${sid}: ${s.matched} / ${d.whale.target} matched · collected ${s.collected} · trades with outcome ${s.trades_with_outcome}</div>`)
-            .join("");
-        const ko = document.getElementById("kp-k-others");
-        if (ko) ko.innerHTML = Object.entries(d.kronos.by_strategy || {})
-            .filter(([sid]) => sid !== "CSM")
-            .map(([sid, s]) => `<div class="kp-sub">${sid} shadow: ${s.matched} / ${d.kronos.target} matched · scored ${s.scored} · trades with outcome ${s.trades_with_outcome} (not gated)</div>`)
-            .join("");
-        const g = document.getElementById("kp-gate");
-        if (g && d.gate) {
-            const m = d.gate.mode || "unknown";
-            g.textContent = m === "live" ? `LIVE · thr ${d.gate.threshold}`
-                          : m === "shadow" ? `SHADOW · thr ${d.gate.threshold}` : m.toUpperCase();
-            g.className = "pill " + (m === "live" ? "pill-green" : "pill-amber");
-        }
-        const q = document.getElementById("kp-q"); if (q) q.textContent = d.queue.candidates;
-        const t = document.getElementById("kp-trades"); if (t) t.textContent = d.csm_trades_with_outcome;
-        if (upd) upd.textContent = `updated ${kpFmtTs(d.generated)}`;
-    } catch (err) {
-        if (upd) upd.textContent = `Could not load: ${err.message}`;
-    }
-}
-
-document.getElementById("kp-toggle")?.addEventListener("click", () => {
-    const panel = document.getElementById("kronos-panel");
-    if (!panel) return;
-    const open = panel.style.display === "none";
-    panel.style.display = open ? "" : "none";
-    if (open) {
-        fetchKronosProgress();
-        KP_TIMER = setInterval(fetchKronosProgress, 60000);
-    } else if (KP_TIMER) {
-        clearInterval(KP_TIMER); KP_TIMER = null;
-    }
-});
-document.getElementById("kp-refresh")?.addEventListener("click", fetchKronosProgress);
